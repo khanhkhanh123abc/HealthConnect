@@ -1,17 +1,20 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-const initialState = {
-    isLoggedIn: false,
-    userInfo: null,
-};
+// const initialState = {
+//     isLoggedIn: false,
+//     userInfo: null,
+// };
 
 export const userSlice = createSlice({
     name: 'user',
-    initialState,
+    initialState: {
+        isLoggedIn: false,
+        userInfo: null, // Sẽ chứa roleId ở đây
+    },
     reducers: {
         loginSuccess: (state, action) => {
             state.isLoggedIn = true;
-            state.userInfo = action.payload; // Lưu thông tin user từ backend trả về
+            state.userInfo = action.payload; // payload bao gồm email, roleId...
         },
         processLogout: (state) => {
             state.isLoggedIn = false;

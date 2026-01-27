@@ -9,4 +9,8 @@ const handleLoginApi = (userEmail, userPassword) => {
     return instance.post('/api/login', { email: userEmail, password: userPassword });
 }
 
-export { handleLoginApi };
+const getAllUsers = (inputId) => {
+    return instance.get(`/api/get-all-users?id=${inputId}`);
+}
+
+export { handleLoginApi, getAllUsers };

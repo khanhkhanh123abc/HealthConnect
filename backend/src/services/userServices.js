@@ -1,3 +1,4 @@
+import { raw } from 'body-parser';
 import db from '../models/index.js';
 import bcrypt from 'bcryptjs';
 
@@ -21,7 +22,7 @@ let hendleUserLogin = (email, password) => {
                     if (check) {
                         userData.errCode = 0;
                         userData.errMessage = 'OK';
-                        
+
                         // Xóa password trước khi gửi về client để bảo mật
                         delete user.password;
                         userData.user = user;
@@ -51,7 +52,7 @@ let checkUserEmail = (email) => {
             let user = await db.User.findOne({
                 where: { email: email }
             });
-            
+
             if (user) {
                 resolve(true);
             } else {
@@ -62,8 +63,35 @@ let checkUserEmail = (email) => {
         }
     });
 }
+let getAllUsers = (userId) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            let users = ''
+            if (userId === 'All') {
+                users = await db.User.findAll({
+                    attributes: {
+                        raw: true,
+                        exclude: ['password']
+                    }
+                });
+            }
+            if (userId && userId !== 'All') {
+                users = await db.User.findOne({
+                    where: { id: userId },
+                    attributes: {
+                        exclude: ['password']
+                    }
+                });
+            }
+            resolve(users);
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
 
 module.exports = {
     hendleUserLogin: hendleUserLogin,
     checkUserEmail: checkUserEmail,
+    getAllUsers: getAllUsers
 }

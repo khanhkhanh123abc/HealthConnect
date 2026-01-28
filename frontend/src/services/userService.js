@@ -13,4 +13,16 @@ const getAllUsers = (inputId) => {
     return instance.get(`/api/get-all-users?id=${inputId}`);
 }
 
-export { handleLoginApi, getAllUsers };
+const createNewUser = (data) => {
+    return instance.post('/api/create-new-user', data);
+}
+
+const editUser = (data) => {
+    return instance.put('/api/edit-user', data);
+}
+
+const deleteUser = (userId) => {
+    return instance.delete(`/api/delete-user?id=${userId}`);
+}
+
+export { handleLoginApi, getAllUsers, createNewUser, editUser, deleteUser };

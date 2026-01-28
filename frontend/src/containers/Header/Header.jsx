@@ -19,18 +19,18 @@ const Header = () => {
     };
 
     return (
-        <header className="w-full bg--700 text-white shadow-lg sticky top-0 z-50">
+        <header className="w-full bg-pink-600 text-white shadow-lg sticky top-0 z-50">
+
             <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-                
                 {/* Khối bên trái: Logo & Menu */}
                 <div className="flex items-center space-x-10">
                     <Link to="/home" className="text-xl font-extrabold tracking-tighter uppercase hover:opacity-80 transition-opacity">
                         Health<span className="text-indigo-300">Connect</span>
                     </Link>
-                    
+
                     <nav className="hidden md:flex items-center space-x-1">
                         {menu.map((item, index) => (
-                            <Link 
+                            <Link
                                 key={index}
                                 to={item.link}
                                 className="px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-600 transition-all duration-200"
@@ -44,11 +44,11 @@ const Header = () => {
                 {/* Khối bên phải: User Info & Logout */}
                 <div className="flex items-center space-x-6">
                     <div className="hidden sm:block text-right">
-                        <p className="text-xs text-indigo-200 leading-none">Logged in as</p>
+                        <p className="text-xs text-gray-indigo-200 leading-none">Logged in as</p>
                         <p className="text-sm font-semibold">{userInfo?.firstName || 'User'}</p>
                     </div>
-                    
-                    <button 
+
+                    <button
                         onClick={handleLogout}
                         className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 px-4 py-1.5 rounded-full border border-white/30 text-xs font-bold uppercase tracking-wider transition-all active:scale-95"
                     >

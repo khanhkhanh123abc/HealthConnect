@@ -1,0 +1,15 @@
+.header-logo {
+    width: 160px; 
+    height: 48px;
+    
+    background: url('../../assets/logo.svg') no-repeat center center;
+    background-size: contain;
+
+    image-rendering: -webkit-optimize-contrast;
+}
+
+
+.header-logo:hover {
+    opacity: 0.8;
+    transition: all 0.2s ease;
+}

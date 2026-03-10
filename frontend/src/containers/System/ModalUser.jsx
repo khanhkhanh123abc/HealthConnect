@@ -1,56 +1,52 @@
 import React, { useState, useEffect } from 'react';
 
 const initialState = {
-        email: '',
-        password: '',
-        firstName: '',
-        lastName: '',
-        address: '',
-        phoneNumber: '',
-        gender: '1',
-        roleId: 'PATIENT',
-        positionId: 'P0'
-    };
-const ModalUser = (props) => {
+    email: '',
+    password: '',
+    firstName: '',
+    lastName: '',
+    address: '',
+    phoneNumber: '',
+    gender: '1',
+    roleId: 'PATIENT',
+    positionId: 'P0'
+};
 
+const ModalUser = (props) => {
     const [userData, setUserData] = useState(initialState);
 
-    // Tự động điền dữ liệu khi vào chế độ Edit
-    // src/containers/System/ModalUser.jsx
     useEffect(() => {
-        const fillUserData = () => {
-            // Chỉ cập nhật khi Modal mở và đang ở chế độ Edit
+        const fillData = () => {
             if (props.isOpen && props.isEditMode && props.currentUser) {
+            
                 setUserData({
                     ...props.currentUser,
-                    password: 'hardcode_password' // Giữ nguyên logic bảo mật của bạn
+                    password: 'hardcode_password' 
                 });
-            }
-
-            // Reset form khi Modal đóng hoặc chuyển sang chế độ Add New
-            if (!props.isOpen) {
-                setUserData(initialState);
             }
         };
 
-        fillUserData();
-    }, [props.isOpen, props.isEditMode, props.currentUser]); // Chỉ chạy khi 1 trong 3 giá trị này thay đổi [props.isOpen, props.currentUser, props.isEditMode]);
+        fillData();
+        if (!props.isOpen) {
+            setUserData(initialState);
+        }
+    }, [props.isOpen, props.isEditMode, props.currentUser]); 
 
     const handleOnChangeInput = (e, field) => {
         setUserData({
             ...userData,
             [field]: e.target.value
         });
-    }
+    };
 
     const handleSaveUser = () => {
-        // Validation cơ bản
+        
         if (!userData.email || (!props.isEditMode && !userData.password)) {
             alert("Missing required fields!");
             return;
         }
-
-        // Gọi hàm saveUser chung của cha (xử lý cả Create/Edit)
+        
+        
         props.saveUser(userData);
     };
 
@@ -69,11 +65,11 @@ const ModalUser = (props) => {
                             type="email"
                             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none disabled:bg-gray-200"
                             value={userData.email}
-                            disabled={props.isEditMode} // Không cho sửa email khi edit
+                            disabled={props.isEditMode} 
                             onChange={(e) => handleOnChangeInput(e, 'email')}
                         />
                     </div>
-                    {!props.isEditMode && ( // Chỉ hiện ô Password khi thêm mới
+                    {!props.isEditMode && ( 
                         <div className="flex flex-col">
                             <label className="text-sm font-semibold mb-1 text-slate-700">Password</label>
                             <input

@@ -2,43 +2,31 @@ import React, { Fragment } from 'react';
 import { useSelector } from 'react-redux';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css'; // Sửa lại đường dẫn CSS chuẩn
-
-// Import các Page/Component
+import 'react-toastify/dist/ReactToastify.css';
 import Login from './pages/Login';
 import Home from './pages/Home';
-import System from './containers/System/System'; // Cập nhật đường dẫn containers
-import Header from './containers/Header/Header'; // Cập nhật đường dẫn containers
+import HomePage from './containers/HomePage/HomePage';
+import System from './containers/System/System';
 import DefaultLayout from './containers/DefaultLayout';
 
 function App() {
-  // Lấy trạng thái đăng nhập từ Redux
   const isLoggedIn = useSelector((state) => state.user.isLoggedIn);
 
   return (
     <Fragment>
       <Router>
         <div className="main-container">
-          {/* Header sẽ hiện ra ngay khi isLoggedIn là true */}
-          {/* {isLoggedIn && <Header />} */}
-
           <main className="content-container">
             <Routes>
-              {/* Login: Nếu đã login thì đá sang /home */}
+              <Route path="/homepage" element={
+                  <HomePage />
+              } />
+
+
               <Route path="/login" element={
-                !isLoggedIn ? <Login /> : <Navigate to="/home" />
+                !isLoggedIn ? <Login /> : <Navigate to="/system" />
               } />
 
-              {/* Home: Dành cho mọi user đã login */}
-              <Route path="/home" element={
-                isLoggedIn ? (
-                  <DefaultLayout>
-                    <Home />
-                  </DefaultLayout>
-                ) : <Navigate to="/login" />
-              } />
-
-              {/* System: Dành cho Admin/Doctor */}
               <Route path="/system/*" element={
                 isLoggedIn ? (
                   <DefaultLayout>
@@ -47,12 +35,11 @@ function App() {
                 ) : <Navigate to="/login" />
               } />
 
-              {/* Mặc định điều hướng dựa trên trạng thái login */}
-              <Route path="/" element={
-                isLoggedIn ? <Navigate to="/home" /> : <Navigate to="/login" />
-              } />
-            </Routes>
+              <Route path="/" element={<Navigate to="/homepage" />} />
 
+
+              <Route path="*" element={<Navigate to="/homepage" />} />
+            </Routes>
           </main>
 
           <ToastContainer position="bottom-right" autoClose={3000} />

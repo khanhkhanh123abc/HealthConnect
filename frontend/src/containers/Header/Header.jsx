@@ -1,66 +1,99 @@
 import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { adminMenu, doctorMenu } from './menuConfig';
-import { Link, useNavigate } from 'react-router-dom';
-import { processLogout } from '../../store/slices/userSlice';
+import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate, Link } from 'react-router-dom';
+import { processLogout } from "../../store/slices/userSlice";
+import logo from '../../assets/logo.svg';
 
-const Header = () => {
+const HomeHeader = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+
+    const isLoggedIn = useSelector(state => state.user.isLoggedIn);
     const userInfo = useSelector(state => state.user.userInfo);
 
-    // Tính toán menu trực tiếp để tránh lỗi render lặp
-    const role = userInfo?.roleId?.trim(); // Khớp với ADMIN/DOCTOR trong DB
-    const menu = role === 'ADMIN' ? adminMenu : (role === 'DOCTOR' ? doctorMenu : []);
+    const returnToHome = () => {
+        navigate('/home');
+    }
+
+    const handleLogin = () => {
+        navigate('/login');
+    }
 
     const handleLogout = () => {
         dispatch(processLogout());
-        navigate('/login');
+        navigate('/home');
+    }
+
+    const renderNavLinks = () => {
+        // 1. ADMIN Menu
+        if (isLoggedIn && userInfo?.roleId === 'R1') {
+            return (
+                <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
+                    <Link to="/system/user-manage" className="hover:text-indigo-600 uppercase transition-colors">User Management</Link>
+                    <Link to="/system/clinic-manage" className="hover:text-indigo-600 uppercase transition-colors">Clinic Management</Link>
+                    <Link to="/system/specialty-manage" className="hover:text-indigo-600 uppercase transition-colors">Specialty Management</Link>
+                </div>
+            );
+        }
+
+        // 2. DOCTOR Menu
+        if (isLoggedIn && userInfo?.roleId === 'R2') {
+            return (
+                <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
+                    <Link to="/doctor/manage-schedule" className="hover:text-indigo-600 uppercase transition-colors">Schedule</Link>
+                    <Link to="/doctor/manage-patient" className="hover:text-indigo-600 uppercase transition-colors">Patients</Link>
+                </div>
+            );
+        }
+
+        // 3. DEFAULT (Guest or Patient)
+        return (
+            <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
+                <div className="hover:text-indigo-600 cursor-pointer uppercase transition-colors">Specialties</div>
+                <div className="hover:text-indigo-600 cursor-pointer uppercase transition-colors">Facilities</div>
+                <div className="hover:text-indigo-600 cursor-pointer uppercase transition-colors">Doctors</div>
+                <div className="hover:text-indigo-600 cursor-pointer uppercase transition-colors">Packages</div>
+            </div>
+        );
     };
 
     return (
-        <header className="w-full bg-pink-600 text-white shadow-lg sticky top-0 z-50">
-
-            <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-                {/* Khối bên trái: Logo & Menu */}
-                <div className="flex items-center space-x-10">
-                    <Link to="/home" className="text-xl font-extrabold tracking-tighter uppercase hover:opacity-80 transition-opacity">
-                        Health<span className="text-indigo-300">Connect</span>
-                    </Link>
-
-                    <nav className="hidden md:flex items-center space-x-1">
-                        {menu.map((item, index) => (
-                            <Link
-                                key={index}
-                                to={item.link}
-                                className="px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-600 transition-all duration-200"
-                            >
-                                {item.name}
-                            </Link>
-                        ))}
-                    </nav>
-                </div>
-
-                {/* Khối bên phải: User Info & Logout */}
-                <div className="flex items-center space-x-6">
-                    <div className="hidden sm:block text-right">
-                        <p className="text-xs text-gray-indigo-200 leading-none">Logged in as</p>
-                        <p className="text-sm font-semibold">{userInfo?.firstName || 'User'}</p>
-                    </div>
-
-                    <button
-                        onClick={handleLogout}
-                        className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 px-4 py-1.5 rounded-full border border-white/30 text-xs font-bold uppercase tracking-wider transition-all active:scale-95"
-                    >
-                        <span>Logout</span>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                    </button>
-                </div>
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md h-16 px-6 flex items-center justify-between">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={returnToHome}>
+                <img src={logo} alt="HealthConnect" className="w-[160px] h-auto" />
             </div>
-        </header>
+
+            {renderNavLinks()}
+
+            <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 text-slate-500 mr-2 hover:text-indigo-600 cursor-pointer">
+                    <i className="fas fa-question-circle"></i>
+                    <span className="text-xs font-medium">Support</span>
+                </div>
+
+                {isLoggedIn ? (
+                    <div className="flex items-center gap-3 border-l pl-4 border-slate-200">
+                        <span className="text-sm font-medium text-slate-700">
+                            Hello, <span className="font-bold text-indigo-600">{userInfo?.firstName}</span>
+                        </span>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-rose-50 hover:bg-rose-100 text-rose-600 px-4 py-1.5 rounded-md text-sm font-bold transition-all"
+                        >
+                            Log Out
+                        </button>
+                    </div>
+                ) : (
+                    <button
+                        onClick={handleLogin}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg shadow-indigo-200 transition-all active:scale-95"
+                    >
+                        Log In
+                    </button>
+                )}
+            </div>
+        </div>
     );
 };
 
-export default Header;
+export default HomeHeader;

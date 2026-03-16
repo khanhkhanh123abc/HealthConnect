@@ -155,6 +155,7 @@ let handleEditUser = (data) => {
                 user.gender = data.gender === '1' ? true : false;
                 user.roleId = data.roleId;
                 user.positionId = data.positionId;
+                user.image = data.image;
                 await user.save();
                 resolve({
                     errCode: 0,
@@ -194,11 +195,35 @@ let handleDeleteUser = (userId) => {
     });
 }
 
+let getAllCodeService = (typeInput) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (!typeInput) {
+                resolve({
+                    errCode: 1,
+                    errMessage: 'Missing required parameters'
+                });
+            } else {
+                let res = {};
+                let allcode = await db.allCode.findAll({
+                    where: { type: typeInput }
+                });
+                res.errCode = 0;
+                res.data = allcode;
+                resolve(res);
+            }
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
 module.exports = {
     hendleUserLogin: hendleUserLogin,
     checkUserEmail: checkUserEmail,
     getAllUsers: getAllUsers,
     createNewUser: createNewUser,
     handleEditUser: handleEditUser,
-    handleDeleteUser: handleDeleteUser
+    handleDeleteUser: handleDeleteUser,
+    getAllCodeService: getAllCodeService
 }

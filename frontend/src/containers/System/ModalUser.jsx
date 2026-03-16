@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../../supabaseClient';
 
 const initialState = {
     email: '',
@@ -8,138 +9,207 @@ const initialState = {
     address: '',
     phoneNumber: '',
     gender: '1',
-    roleId: 'PATIENT',
-    positionId: 'P0'
+    roleId: 'R1',
+    image: ''
 };
 
-const ModalUser = (props) => {
+const ModalUser = ({
+    isOpen,
+    isEditMode,
+    currentUser,
+    toggleFromParent,
+    saveUser
+}) => {
+
     const [userData, setUserData] = useState(initialState);
+    const [isUploading, setIsUploading] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState('');
 
+    // Sync data khi mở modal
     useEffect(() => {
-        const fillData = () => {
-            if (props.isOpen && props.isEditMode && props.currentUser) {
-            
-                setUserData({
-                    ...props.currentUser,
-                    password: 'hardcode_password' 
-                });
-            }
-        };
+        if (!isOpen) return;
 
-        fillData();
-        if (!props.isOpen) {
+        if (isEditMode && currentUser) {
+            setUserData({ ...initialState, ...currentUser });
+            setPreviewUrl(currentUser.image || '');
+        } else {
             setUserData(initialState);
+            setPreviewUrl('');
         }
-    }, [props.isOpen, props.isEditMode, props.currentUser]); 
+    }, [isOpen, isEditMode, currentUser]);
 
     const handleOnChangeInput = (e, field) => {
-        setUserData({
-            ...userData,
-            [field]: e.target.value
-        });
+        const value = e.target.value;
+
+        setUserData(prev => ({
+            ...prev,
+            [field]: value
+        }));
     };
 
-    const handleSaveUser = () => {
-        
-        if (!userData.email || (!props.isEditMode && !userData.password)) {
-            alert("Missing required fields!");
+    // Upload ảnh lên Supabase Storage và lấy URL public
+    const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    
+    // Đặt tên file ngẫu nhiên để không bị trùng
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}.${fileExt}`;
+    const filePath = `avatars/${fileName}`; // Lưu vào thư mục avatars
+
+    // 1. Upload file lên Supabase Storage (Bucket tên là 'healthconnect')
+    const { error: uploadError } = await supabase.storage
+        .from('healthconnect') 
+        .upload(filePath, file);
+
+    if (uploadError) {
+        console.error("Lỗi upload Supabase:", uploadError);
+        setIsUploading(false);
+        return;
+    }
+
+    // 2. Lấy đường link public để hiển thị và lưu vào DB
+    const { data } = supabase.storage
+        .from('healthconnect')
+        .getPublicUrl(filePath);
+
+    // Cập nhật URL ảnh vào state
+    setUserData({ ...userData, image: data.publicUrl });
+    setPreviewUrl(data.publicUrl);
+    setIsUploading(false);
+};
+
+    const handleSave = () => {
+
+        if (!userData.email || (!isEditMode && !userData.password)) {
+            alert("Missing required fields");
             return;
         }
-        
-        
-        props.saveUser(userData);
+
+        const data = { ...userData };
+
+        if (isEditMode) {
+            delete data.password;
+        }
+
+        saveUser(data);
     };
 
-    return (
-        <div className={`fixed inset-0 z-[999] grid h-screen w-screen place-items-center bg-black bg-opacity-60 transition-opacity duration-300 ${props.isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-            } backdrop-blur-sm`}>
-            <div className="relative m-4 p-6 w-full max-w-[800px] rounded-xl bg-white shadow-2xl overflow-y-auto max-h-[90vh]">
-                <div className="flex shrink-0 items-center pb-4 text-2xl font-bold text-slate-800 border-b border-slate-100">
-                    {props.isEditMode ? "Edit User" : "Create New User"}
-                </div>
+    if (!isOpen) return null;
 
-                <div className="relative py-6 grid grid-cols-2 gap-x-6 gap-y-4 text-slate-600">
-                    <div className="flex flex-col">
-                        <label className="text-sm font-semibold mb-1 text-slate-700">Email</label>
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+
+            <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 overflow-y-auto max-h-[90vh]">
+
+                <h3 className="text-xl font-bold mb-4">
+                    {isEditMode ? 'Edit User' : 'Add New User'}
+                </h3>
+
+                <div className="grid grid-cols-2 gap-4">
+
+                    <input
+                        className="border p-2 rounded"
+                        placeholder="Email"
+                        value={userData.email}
+                        onChange={(e) => handleOnChangeInput(e, 'email')}
+                        disabled={isEditMode}
+                    />
+
+                    {!isEditMode && (
                         <input
-                            type="email"
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none disabled:bg-gray-200"
-                            value={userData.email}
-                            disabled={props.isEditMode} 
-                            onChange={(e) => handleOnChangeInput(e, 'email')}
+                            className="border p-2 rounded"
+                            type="password"
+                            placeholder="Password"
+                            value={userData.password}
+                            onChange={(e) => handleOnChangeInput(e, 'password')}
                         />
-                    </div>
-                    {!props.isEditMode && ( 
-                        <div className="flex flex-col">
-                            <label className="text-sm font-semibold mb-1 text-slate-700">Password</label>
-                            <input
-                                type="password"
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none"
-                                value={userData.password}
-                                onChange={(e) => handleOnChangeInput(e, 'password')}
-                            />
-                        </div>
                     )}
+
+                    <input
+                        className="border p-2 rounded"
+                        placeholder="First Name"
+                        value={userData.firstName}
+                        onChange={(e) => handleOnChangeInput(e, 'firstName')}
+                    />
+
+                    <input
+                        className="border p-2 rounded"
+                        placeholder="Last Name"
+                        value={userData.lastName}
+                        onChange={(e) => handleOnChangeInput(e, 'lastName')}
+                    />
+
+                    {/* ROLE */}
                     <div className="flex flex-col">
-                        <label className="text-sm font-semibold mb-1 text-slate-700">First Name</label>
-                        <input
-                            type="text"
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none"
-                            value={userData.firstName}
-                            onChange={(e) => handleOnChangeInput(e, 'firstName')}
-                        />
-                    </div>
-                    <div className="flex flex-col">
-                        <label className="text-sm font-semibold mb-1 text-slate-700">Last Name</label>
-                        <input
-                            type="text"
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none"
-                            value={userData.lastName}
-                            onChange={(e) => handleOnChangeInput(e, 'lastName')}
-                        />
-                    </div>
-                    <div className="flex flex-col">
-                        <label className="text-sm font-semibold mb-1 text-slate-700">Address</label>
-                        <input
-                            type="text"
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none"
-                            value={userData.address}
-                            onChange={(e) => handleOnChangeInput(e, 'address')}
-                        />
-                    </div>
-                    <div className="flex flex-col">
-                        <label className="text-sm font-semibold mb-1 text-slate-700">Phone Number</label>
-                        <input
-                            type="text"
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none"
-                            value={userData.phoneNumber}
-                            onChange={(e) => handleOnChangeInput(e, 'phoneNumber')}
-                        />
-                    </div>
-                    <div className="flex flex-col">
-                        <label className="text-sm font-semibold mb-1 text-slate-700">Gender</label>
+                        <label className="text-sm font-semibold">Role</label>
+
                         <select
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none"
-                            value={userData.gender}
-                            onChange={(e) => handleOnChangeInput(e, 'gender')}
+                            className="border p-2 rounded"
+                            value={userData.roleId}
+                            onChange={(e) => handleOnChangeInput(e, 'roleId')}
                         >
-                            <option value="1">Male</option>
-                            <option value="0">Female</option>
+                            <option value="R1">Admin</option>
+                            <option value="R2">Doctor</option>
+                            <option value="R3">Patient</option>
                         </select>
                     </div>
+
+                    {/* AVATAR */}
+                    <div className="flex flex-col">
+                        <label className="text-sm font-semibold">Avatar</label>
+
+                        <input
+                            type="file"
+                            onChange={handleImageChange}
+                            className="text-sm"
+                        />
+
+                        {isUploading && (
+                            <span className="text-blue-500 text-xs">
+                                Uploading...
+                            </span>
+                        )}
+                    </div>
+
+                    {/* PREVIEW */}
+                    <div className="col-span-2 flex justify-center">
+                        {previewUrl && (
+                            <img
+                                src={previewUrl}
+                                className="w-20 h-20 rounded-full object-cover border"
+                                alt="preview"
+                            />
+                        )}
+                    </div>
+
                 </div>
 
-                <div className="flex shrink-0 flex-wrap items-center pt-4 justify-end border-t border-slate-100">
-                    <button onClick={props.toggleFromParent} className="px-6 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-md">
+                <div className="mt-6 flex justify-end gap-3">
+
+                    <button
+                        onClick={toggleFromParent}
+                        className="px-4 py-2 bg-gray-200 rounded"
+                    >
                         Cancel
                     </button>
-                    <button onClick={handleSaveUser} className="ml-2 px-6 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-md">
-                        {props.isEditMode ? "Update Changes" : "Confirm Create"}
+
+                    <button
+                        onClick={handleSave}
+                        disabled={isUploading}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-400"
+                    >
+                        {isEditMode ? 'Save Changes' : 'Create User'}
                     </button>
+
                 </div>
+
             </div>
         </div>
     );
+
 };
 
 export default ModalUser;

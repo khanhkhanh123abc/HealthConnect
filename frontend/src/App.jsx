@@ -3,11 +3,11 @@ import { useSelector } from 'react-redux';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Login from './pages/Login';
+import Login from './pages/System/Login/Login';
 import Home from './pages/Home';
-import HomePage from './containers/HomePage/HomePage';
-import System from './containers/System/System';
-import DefaultLayout from './containers/DefaultLayout';
+import HomePage from './pages/Home';
+import System from './pages/System/System';
+import DefaultLayout from './layout/DefaultLayout';
 
 function App() {
   const isLoggedIn = useSelector((state) => state.user.isLoggedIn);
@@ -19,7 +19,7 @@ function App() {
           <main className="content-container">
             <Routes>
               <Route path="/homepage" element={
-                  <HomePage />
+                <HomePage />
               } />
 
 

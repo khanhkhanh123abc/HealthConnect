@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
+import { supabase } from '../../../supabaseClient';
 
 const initialState = {
     email: '',
@@ -49,37 +49,37 @@ const ModalUser = ({
 
     // Upload ảnh lên Supabase Storage và lấy URL public
     const handleImageChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+        const file = e.target.files[0];
+        if (!file) return;
 
-    setIsUploading(true);
-    
-    // Đặt tên file ngẫu nhiên để không bị trùng
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `avatars/${fileName}`; // Lưu vào thư mục avatars
+        setIsUploading(true);
 
-    // 1. Upload file lên Supabase Storage (Bucket tên là 'healthconnect')
-    const { error: uploadError } = await supabase.storage
-        .from('healthconnect') 
-        .upload(filePath, file);
+        // Đặt tên file ngẫu nhiên để không bị trùng
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `avatars/${fileName}`; // Lưu vào thư mục avatars
 
-    if (uploadError) {
-        console.error("Lỗi upload Supabase:", uploadError);
+        // 1. Upload file lên Supabase Storage (Bucket tên là 'healthconnect')
+        const { error: uploadError } = await supabase.storage
+            .from('healthconnect')
+            .upload(filePath, file);
+
+        if (uploadError) {
+            console.error("Lỗi upload Supabase:", uploadError);
+            setIsUploading(false);
+            return;
+        }
+
+        // 2. Lấy đường link public để hiển thị và lưu vào DB
+        const { data } = supabase.storage
+            .from('healthconnect')
+            .getPublicUrl(filePath);
+
+        // Cập nhật URL ảnh vào state
+        setUserData({ ...userData, image: data.publicUrl });
+        setPreviewUrl(data.publicUrl);
         setIsUploading(false);
-        return;
-    }
-
-    // 2. Lấy đường link public để hiển thị và lưu vào DB
-    const { data } = supabase.storage
-        .from('healthconnect')
-        .getPublicUrl(filePath);
-
-    // Cập nhật URL ảnh vào state
-    setUserData({ ...userData, image: data.publicUrl });
-    setPreviewUrl(data.publicUrl);
-    setIsUploading(false);
-};
+    };
 
     const handleSave = () => {
 

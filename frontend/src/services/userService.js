@@ -1,28 +1,26 @@
-import axios from 'axios';
-
-// Cấu hình instance axios (để sau này dùng chung)
-const instance = axios.create({
-    baseURL: 'http://localhost:8080' // Cổng backend của bạn
-});
+import axios from '../utils/axios';
 
 const handleLoginApi = (userEmail, userPassword) => {
-    return instance.post('/api/login', { email: userEmail, password: userPassword });
+    return axios.post('/api/login', { email: userEmail, password: userPassword });
 }
 
 const getAllUsers = (inputId) => {
-    return instance.get(`/api/get-all-users?id=${inputId}`);
+    return axios.get(`/api/get-all-users?id=${inputId}`);
 }
 
 const createNewUser = (data) => {
-    return instance.post('/api/create-new-user', data);
+    return axios.post('/api/create-new-user', data);
 }
 
 const editUser = (data) => {
-    return instance.put('/api/edit-user', data);
+    return axios.put('/api/edit-user', data);
 }
 
 const deleteUser = (userId) => {
-    return instance.delete(`/api/delete-user?id=${userId}`);
+    return axios.delete(`/api/delete-user?id=${userId}`);
+}
+const getAllCodeService = (inputType) => {
+    return axios.get(`/api/allcode?type=${inputType}`);
 }
 
-export { handleLoginApi, getAllUsers, createNewUser, editUser, deleteUser };
+export { handleLoginApi, getAllUsers, createNewUser, editUser, deleteUser , getAllCodeService};

@@ -32,6 +32,7 @@ const HomeHeader = () => {
                     <Link to="/system/user-manage" className="hover:text-indigo-600 uppercase transition-colors">User Management</Link>
                     <Link to="/system/clinic-manage" className="hover:text-indigo-600 uppercase transition-colors">Clinic Management</Link>
                     <Link to="/system/specialty-manage" className="hover:text-indigo-600 uppercase transition-colors">Specialty Management</Link>
+                    <Link to="/system/doctor-manage" className="hover:text-indigo-600 uppercase transition-colors">Doctor Management</Link>
                 </div>
             );
         }

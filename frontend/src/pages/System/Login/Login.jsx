@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { handleLoginApi } from '../services/userService';
-import { loginSuccess } from '../store/slices/userSlice';
+import { handleLoginApi } from '../../../services/userService';
+import { loginSuccess } from '../../../store/slices/userSlice';
 
 const Login = () => {
     const dispatch = useDispatch();

@@ -199,10 +199,7 @@ let getAllCodeService = (typeInput) => {
     return new Promise(async (resolve, reject) => {
         try {
             if (!typeInput) {
-                resolve({
-                    errCode: 1,
-                    errMessage: 'Missing required parameters'
-                });
+                resolve({ errCode: 1, errMessage: 'Missing required parameters!' });
             } else {
                 let res = {};
                 let allcode = await db.allCode.findAll({

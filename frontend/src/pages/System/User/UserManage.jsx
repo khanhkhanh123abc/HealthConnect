@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { getAllUsers, createNewUser, deleteUser, editUser } from '../../services/userService';
+import { getAllUsers, createNewUser, deleteUser, editUser } from '../../../services/userService';
 import ModalUser from './ModalUser';
 
 const UserManage = () => {

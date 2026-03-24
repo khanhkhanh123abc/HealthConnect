@@ -9,7 +9,7 @@ let getTopDoctorHome = async (req, res) => {
     try {
         // Gọi hàm bên file Service, thêm dấu + để ép kiểu string thành số (integer)
         let response = await doctorService.getTopDoctorHome(+limit);
-        
+
         // Trả kết quả về cho Frontend
         return res.status(200).json(response);
     } catch (e) {
@@ -47,9 +47,22 @@ let postInforDoctor = async (req, res) => {
         });
     }
 }
+let getProfileDoctorById = async (req, res) => {
+    try {
+        let info = await doctorService.getProfileDoctorById(req.query.doctorId);
+        return res.status(200).json(info);
+    } catch (e) {
+        console.log(e);
+        return res.status(200).json({
+            errCode: -1,
+            errMessage: 'Error from server'
+        });
+    }
+}
 
 module.exports = {
     getTopDoctorHome: getTopDoctorHome,
     getAllDoctors: getAllDoctors,
-    postInforDoctor: postInforDoctor
+    postInforDoctor: postInforDoctor,
+    getProfileDoctorById: getProfileDoctorById
 }

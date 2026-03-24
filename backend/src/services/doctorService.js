@@ -124,9 +124,44 @@ let saveDetailInforDoctor = (inputData) => {
         }
     });
 }
+let getProfileDoctorById = (inputId) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (!inputId) {
+                resolve({ errCode: 1, errMessage: 'Missing required parameter' });
+            } else {
+                let data = await db.User.findOne({
+                    where: { id: inputId },
+                    attributes: { exclude: ['password'] }, // Không lấy password bảo mật
+                    include: [
+                        // 1. Lấy thông tin bài viết (Mô tả, HTML)
+                        { model: db.Markdown, attributes: ['description', 'contentHTML', 'contentMarkdown'] },
+                        // 2. Lấy thông tin chức danh (Allcode)
+                        { model: db.allCode, as: 'positionData', attributes: ['value'] },
+                        // 3. Lấy thông tin Giá khám, Tỉnh thành, Phòng khám (Doctor_Info)
+                        { model: db.Doctor_Info, attributes: { exclude: ['id', 'doctorId'] } }
+                    ],
+                    raw: false,
+                    nest: true
+                });
+
+                if (data && data.image) {
+                    data.image = new Buffer(data.image, 'base64').toString('binary');
+                }
+
+                if (!data) data = {};
+
+                resolve({ errCode: 0, data: data });
+            }
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
 
 module.exports = {
     getTopDoctorHome: getTopDoctorHome,
     getAllDoctors: getAllDoctors,
-    saveDetailInforDoctor: saveDetailInforDoctor
+    saveDetailInforDoctor: saveDetailInforDoctor,
+    getProfileDoctorById: getProfileDoctorById
 }

@@ -1,93 +1,136 @@
 import React, { useState, useEffect } from 'react';
+import { getScheduleDoctorByDate } from '../services/doctorService';
+import axios from '../utils/axios';
 
-const DoctorSchedule = ({ doctorId }) => {
-    const [allDays, setAllDays] = useState([]);
-    const [allAvailableTime, setAllAvailableTime] = useState([]);
+const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-    // Hàm tự động tạo danh sách 7 ngày tới (Không cần cài thêm thư viện)
+const DoctorSchedule = ({ doctorId, onSelectTime }) => {
+    const [selectedDate, setSelectedDate] = useState(null);
+    const [scheduleData, setScheduleData] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [days, setDays] = useState([]);
+
     useEffect(() => {
-        let arrDays = [];
-        for (let i = 0; i < 7; i++) {
-            let date = new Date();
-            date.setDate(date.getDate() + i);
-            
-            let dd = String(date.getDate()).padStart(2, '0');
-            let mm = String(date.getMonth() + 1).padStart(2, '0');
-            let dayName = i === 0 ? 'Hôm nay' : date.toLocaleDateString('vi-VN', { weekday: 'long' });
-            
-            // Viết hoa chữ cái đầu của tên thứ
-            dayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+        // Tạo 7 ngày từ hôm nay
+        const today = new Date();
+        const next7 = Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(today);
+            d.setDate(today.getDate() + i);
+            d.setHours(0, 0, 0, 0);
+            return d;
+        });
+        setDays(next7);
+        setSelectedDate(next7[0]);
+    }, []);
 
-            arrDays.push({
-                label: `${dayName} - ${dd}/${mm}`,
-                value: date.getTime() // Lưu timestamp để gọi API sau này
+    useEffect(() => {
+        if (!selectedDate || !doctorId) return;
+        fetchSchedule(selectedDate);
+    }, [selectedDate, doctorId]);
+
+    const fetchSchedule = async (date) => {
+        setIsLoading(true);
+        setScheduleData([]);
+        try {
+            // Gọi API mới trả về kèm remainingSlots
+            let res = await axios.get('/api/get-schedule-with-slots', {
+                params: { doctorId, date: date.getTime() }
+            });
+            if (res?.data?.errCode === 0) {
+                setScheduleData(res.data.data || []);
+            } else {
+                // Fallback về API cũ nếu route mới chưa có
+                let res2 = await getScheduleDoctorByDate(doctorId, date.getTime());
+                let raw = res2?.data?.data || [];
+                setScheduleData(raw.map(s => ({
+                    ...s,
+                    remainingSlots: s.maxNumber - s.currentNumber,
+                    isFull: s.currentNumber >= s.maxNumber
+                })));
+            }
+        } catch (e) {
+            console.log('fetchSchedule error:', e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleSelectSlot = (slot) => {
+        if (slot.isFull) return;
+        if (onSelectTime) {
+            onSelectTime({
+                timeType: slot.timeType,
+                timeValue: slot.timeValue,
+                date: selectedDate.getTime(),
+                dateLabel: formatDateLabel(selectedDate),
+                remainingSlots: slot.remainingSlots
             });
         }
-        setAllDays(arrDays);
-        
-        // FAKE DATA Khung giờ (Lát nữa sẽ gọi API getScheduleDoctorByDate ở đây)
-        setAllAvailableTime([
-            { timeType: 'T1', timeDisplay: '08:00 - 09:00' },
-            { timeType: 'T2', timeDisplay: '09:00 - 10:00' },
-            { timeType: 'T3', timeDisplay: '10:00 - 11:00' },
-            { timeType: 'T4', timeDisplay: '14:00 - 15:00' },
-        ]);
-    }, [doctorId]);
+    };
 
-    const handleOnChangeSelect = (event) => {
-        // Lấy value (timestamp) của ngày được chọn
-        let dateValue = event.target.value;
-        console.log("Ngày chọn: ", dateValue);
-        // TODO: Gọi API lấy khung giờ theo dateValue và doctorId
+    const formatDateLabel = (date) => {
+        const day = DAY_LABELS[date.getDay()];
+        return `${day} - ${date.getDate()}/${date.getMonth() + 1}`;
     };
 
     return (
-        <div className="flex flex-col gap-4">
-            {/* 1. Thanh chọn Ngày */}
-            <div className="w-48">
-                <select 
-                    className="w-full text-blue-600 font-semibold border-b-2 border-blue-600 pb-1 outline-none bg-transparent cursor-pointer uppercase text-sm"
-                    onChange={(event) => handleOnChangeSelect(event)}
-                >
-                    {allDays && allDays.length > 0 && allDays.map((item, index) => {
-                        return (
-                            <option value={item.value} key={index} className="text-black">
-                                {item.label}
-                            </option>
-                        )
-                    })}
-                </select>
+        <div className="mt-6">
+            {/* 7 ngày */}
+            <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+                {days.map((day, idx) => {
+                    const isSelected = selectedDate?.getTime() === day.getTime();
+                    return (
+                        <button
+                            key={idx}
+                            onClick={() => setSelectedDate(day)}
+                            className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium border transition
+                                ${isSelected
+                                    ? 'bg-indigo-600 text-white border-indigo-600'
+                                    : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-400'
+                                }`}
+                        >
+                            <div>{DAY_LABELS[day.getDay()]}</div>
+                            <div className="text-xs">{day.getDate()}/{day.getMonth() + 1}</div>
+                        </button>
+                    );
+                })}
             </div>
 
-            {/* 2. Tiêu đề Lịch khám */}
-            <div className="font-semibold text-gray-800 uppercase flex items-center gap-2 mt-2">
-                <span className="text-xl">📅</span> Lịch khám
-            </div>
-
-            {/* 3. Lưới các nút Khung giờ */}
-            <div className="flex flex-wrap gap-3">
-                {allAvailableTime && allAvailableTime.length > 0 ? (
-                    allAvailableTime.map((item, index) => {
-                        return (
-                            <button 
-                                key={index}
-                                className="px-4 py-2 bg-yellow-100/50 text-gray-800 font-medium rounded hover:bg-yellow-400 hover:text-white transition shadow-sm border border-yellow-300"
-                            >
-                                {item.timeDisplay}
-                            </button>
-                        )
-                    })
-                ) : (
-                    <div className="text-gray-500 italic text-sm py-4">
-                        Bác sĩ không có lịch hẹn vào ngày này. Vui lòng chọn ngày khác!
-                    </div>
-                )}
-            </div>
-
-            {/* 4. Dòng chú thích */}
-            {allAvailableTime && allAvailableTime.length > 0 && (
-                <div className="text-sm text-gray-600 mt-2 flex items-center gap-1">
-                    Chọn <span className="inline-block w-4 h-4 bg-yellow-400 rounded-sm"></span> và đặt (Miễn phí)
+            {/* Slots */}
+            {isLoading ? (
+                <div className="flex gap-2 flex-wrap">
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="w-36 h-16 bg-gray-100 rounded-lg animate-pulse" />
+                    ))}
+                </div>
+            ) : scheduleData.length === 0 ? (
+                <p className="text-gray-400 text-sm py-4">'There are no scheduled appointments for this day.'</p>
+            ) : (
+                <div className="flex gap-3 flex-wrap">
+                    {scheduleData.map((slot) => (
+                        <button
+                            key={slot.timeType}
+                            onClick={() => handleSelectSlot(slot)}
+                            disabled={slot.isFull}
+                            className={`relative flex flex-col items-center justify-center w-36 h-16 rounded-xl border-2 text-sm font-semibold transition
+                                ${slot.isFull
+                                    ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-60'
+                                    : slot.remainingSlots <= 2
+                                        ? 'bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100'
+                                        : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-400'
+                                }`}
+                        >
+                            <span>{slot.timeValue}</span>
+                            {/* Hiển thị số chỗ còn lại */}
+                            {slot.isFull ? (
+                                <span className="text-xs mt-0.5 text-gray-400">Hết chỗ</span>
+                            ) : (
+                                <span className={`text-xs mt-0.5 ${slot.remainingSlots <= 2 ? 'text-orange-500' : 'text-indigo-400'}`}>
+                                    '{slot.remainingSlots} spots remaining'
+                                </span>
+                            )}
+                        </button>
+                    ))}
                 </div>
             )}
         </div>

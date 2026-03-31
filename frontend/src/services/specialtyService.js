@@ -6,8 +6,11 @@ const createNewSpecialtyService = (data) => {
 const getAllSpecialty = () => {
     return axios.get(`/api/get-all-specialty`);
 };
-
-export {
-    createNewSpecialtyService,
-    getAllSpecialty
+const updateSpecialtyService = (data) => {
+    return axios.put(`/api/update-specialty`, data);
 };
+const deleteSpecialtyService = (id) => {
+    return axios.delete(`/api/delete-specialty?id=${id}`);
+};
+
+export { createNewSpecialtyService, getAllSpecialty, updateSpecialtyService, deleteSpecialtyService };

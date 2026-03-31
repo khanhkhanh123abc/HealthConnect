@@ -4,40 +4,33 @@ import MarkdownIt from 'markdown-it';
 import MdEditor from 'react-markdown-editor-lite';
 import 'react-markdown-editor-lite/lib/index.css';
 import { toast } from 'react-toastify';
-import { getAllDoctorsService, saveDetailDoctorService } from '../../../services/doctorService';
+import { getAllDoctorsService, saveDetailDoctorService, getProfileDoctorById } from '../../../services/doctorService';
 import { getAllCodeService } from '../../../services/userService';
 import { getAllSpecialty } from '../../../services/specialtyService';
 import { getAllClinics } from '../../../services/clinicService';
 
 const mdParser = new MarkdownIt();
 
-// --- HELPERS (Tách ra ngoài để tối ưu bộ nhớ) ---
 const buildDataSelect = (inputData, type) => {
     let result = [];
     let response = inputData?.data ? inputData.data : inputData;
-
     if (response?.errCode === 0 && Array.isArray(response.data)) {
         result = response.data.map((item) => {
-            if (type === 'DOCTOR') {
-                return { label: `${item.lastName} ${item.firstName}`, value: item.id };
-            }
-            if (type === 'SPECIALTY_CLINIC') {
-                return { label: item.name, value: item.id };
-            }
-            return { label: item.value, value: item.keyMap }; // For Price, Payment, Province
+            if (type === 'DOCTOR') return { label: `${item.lastName} ${item.firstName}`, value: item.id };
+            if (type === 'SPECIALTY_CLINIC') return { label: item.name, value: item.id };
+            return { label: item.value, value: item.keyMap };
         });
     }
     return result;
 };
 
 const ManageDoctor = () => {
-    // 1. States cho Editor
     const [descriptionHTML, setDescriptionHTML] = useState('');
     const [descriptionMarkdown, setDescriptionMarkdown] = useState('');
     const [description, setDescription] = useState('');
     const [note, setNote] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    // 2. States cho Selected Values
     const [selectedDoctor, setSelectedDoctor] = useState(null);
     const [selectedPrice, setSelectedPrice] = useState(null);
     const [selectedPayment, setSelectedPayment] = useState(null);
@@ -45,20 +38,14 @@ const ManageDoctor = () => {
     const [selectedClinic, setSelectedClinic] = useState(null);
     const [selectedSpecialty, setSelectedSpecialty] = useState(null);
 
-    // 3. States cho Lists (Data từ API)
     const [lists, setLists] = useState({
-        doctors: [],
-        specialties: [],
-        clinics: [],
-        prices: [],
-        payments: [],
-        provinces: []
+        doctors: [], specialties: [], clinics: [],
+        prices: [], payments: [], provinces: []
     });
 
     useEffect(() => {
         const fetchAllData = async () => {
             try {
-                // Chạy song song tất cả các API để tối ưu tốc độ load
                 const [resDoc, resSpec, resClinic, resPrice, resPay, resProv] = await Promise.all([
                     getAllDoctorsService(),
                     getAllSpecialty(),
@@ -67,7 +54,6 @@ const ManageDoctor = () => {
                     getAllCodeService('PAYMENT'),
                     getAllCodeService('PROVINCE')
                 ]);
-
                 setLists({
                     doctors: buildDataSelect(resDoc, 'DOCTOR'),
                     specialties: buildDataSelect(resSpec, 'SPECIALTY_CLINIC'),
@@ -76,14 +62,83 @@ const ManageDoctor = () => {
                     payments: buildDataSelect(resPay),
                     provinces: buildDataSelect(resProv)
                 });
-            } catch (error) {
-                console.error("Lỗi khi fetch data: ", error);
+            } catch (_error) {
                 toast.error("Không thể tải danh sách dữ liệu!");
             }
         };
-
         fetchAllData();
     }, []);
+
+    // ✅ Khi chọn bác sĩ → fetch data → đổ vào form
+    const handleSelectDoctor = async (selectedOption) => {
+        setSelectedDoctor(selectedOption);
+
+        if (!selectedOption) {
+            clearForm();
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            let res = await getProfileDoctorById(selectedOption.value);
+
+            if (res && res.data && res.data.errCode === 0) {
+                let data = res.data.data;
+
+                // Đổ Markdown
+                if (data.Markdown) {
+                    setDescriptionHTML(data.Markdown.contentHTML || '');
+                    setDescriptionMarkdown(data.Markdown.contentMarkdown || '');
+                    setDescription(data.Markdown.description || '');
+
+                    // Đổ Specialty & Clinic từ Markdown
+                    if (data.Markdown.specialtyId) {
+                        let found = lists.specialties.find(s => s.value === data.Markdown.specialtyId);
+                        setSelectedSpecialty(found || null);
+                    } else {
+                        setSelectedSpecialty(null);
+                    }
+                    if (data.Markdown.clinicId) {
+                        let found = lists.clinics.find(c => c.value === data.Markdown.clinicId);
+                        setSelectedClinic(found || null);
+                    } else {
+                        setSelectedClinic(null);
+                    }
+                } else {
+                    setDescriptionHTML('');
+                    setDescriptionMarkdown('');
+                    setDescription('');
+                    setSelectedSpecialty(null);
+                    setSelectedClinic(null);
+                }
+
+                // Đổ Doctor_Info
+                if (data.Doctor_Info) {
+                    let priceFound = lists.prices.find(p => p.value === data.Doctor_Info.priceId);
+                    let payFound = lists.payments.find(p => p.value === data.Doctor_Info.paymentId);
+                    let provFound = lists.provinces.find(p => p.value === data.Doctor_Info.provinceId);
+
+                    setSelectedPrice(priceFound || null);
+                    setSelectedPayment(payFound || null);
+                    setSelectedProvince(provFound || null);
+                    setNote(data.Doctor_Info.note || '');
+                } else {
+                    setSelectedPrice(null);
+                    setSelectedPayment(null);
+                    setSelectedProvince(null);
+                    setNote('');
+                }
+
+                if (data.Markdown || data.Doctor_Info) {
+                    toast.info("Đã tải thông tin bác sĩ!");
+                }
+            }
+        } catch (error) {
+            console.log("Lỗi fetch doctor info:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleEditorChange = ({ html, text }) => {
         setDescriptionHTML(html);
@@ -91,9 +146,8 @@ const ManageDoctor = () => {
     };
 
     const handleSaveDoctorInfo = async () => {
-        // Validation
         if (!selectedDoctor || !descriptionHTML || !selectedPrice || !selectedPayment || !selectedProvince) {
-            toast.error("Vui lòng điền đầy đủ các trường thông tin bắt buộc!");
+            toast.error("Vui lòng điền đầy đủ các trường bắt buộc!");
             return;
         }
 
@@ -111,13 +165,10 @@ const ManageDoctor = () => {
         };
 
         const res = await saveDetailDoctorService(dataToSend);
-        
-        // Check errCode linh hoạt hơn
         const isSuccess = res?.errCode === 0 || res?.data?.errCode === 0;
 
         if (isSuccess) {
             toast.success("Lưu thông tin Bác sĩ thành công!");
-            clearForm();
         } else {
             toast.error("Lỗi khi lưu thông tin!");
         }
@@ -140,16 +191,24 @@ const ManageDoctor = () => {
         <div className="p-6 bg-white rounded-xl shadow-sm border border-gray-100 min-h-screen">
             <h2 className="text-2xl font-bold text-gray-800 mb-6 uppercase">Quản lý Thông tin Bác sĩ</h2>
 
-            {/* BLOCK 1: CHỌN BÁC SĨ & LỜI GIỚI THIỆU NGẮN */}
+            {/* BLOCK 1: CHỌN BÁC SĨ */}
             <div className="grid grid-cols-2 gap-6 mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-gray-700">Chọn Bác sĩ</label>
+                    <label className="text-sm font-semibold text-gray-700">
+                        Chọn Bác sĩ
+                        {isLoading && (
+                            <span className="ml-2 text-indigo-500 font-normal animate-pulse">
+                                Đang tải dữ liệu...
+                            </span>
+                        )}
+                    </label>
                     <Select
                         value={selectedDoctor}
-                        onChange={setSelectedDoctor}
+                        onChange={handleSelectDoctor}
                         options={lists.doctors}
                         placeholder="Gõ để tìm kiếm..."
                         className="text-sm"
+                        isClearable
                     />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -164,7 +223,7 @@ const ManageDoctor = () => {
                 </div>
             </div>
 
-            {/* BLOCK 2: THÔNG TIN KHÁM BỆNH */}
+            {/* BLOCK 2: THÔNG TIN KHÁM */}
             <div className="grid grid-cols-3 gap-6 mb-6">
                 <div className="flex flex-col gap-2">
                     <label className="text-sm font-semibold text-gray-700">Giá khám</label>
@@ -213,7 +272,13 @@ const ManageDoctor = () => {
                 />
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
+                <button
+                    onClick={clearForm}
+                    className="border border-gray-300 text-gray-600 font-bold py-2.5 px-6 rounded-lg transition hover:bg-gray-50"
+                >
+                    Xóa form
+                </button>
                 <button
                     onClick={handleSaveDoctorInfo}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-lg transition-colors shadow-md"

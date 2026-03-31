@@ -6,8 +6,11 @@ const createNewClinicService = (data) => {
 const getAllClinics = () => {
     return axios.get(`/api/get-all-clinic`);
 };
-
-export {
-    createNewClinicService,
-    getAllClinics
+const updateClinicService = (data) => {
+    return axios.put(`/api/update-clinic`, data);
 };
+const deleteClinicService = (id) => {
+    return axios.delete(`/api/delete-clinic?id=${id}`);
+};
+
+export { createNewClinicService, getAllClinics, updateClinicService, deleteClinicService };

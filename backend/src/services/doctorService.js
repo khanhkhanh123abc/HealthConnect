@@ -1,158 +1,263 @@
 import db from "../models/index";
 
-// Lấy danh sách Bác sĩ nổi bật (Dành cho trang chủ)
+// ============================================================
+// TRANG CHỦ: Lấy danh sách Bác sĩ nổi bật
+// ============================================================
 let getTopDoctorHome = (limitInput) => {
     return new Promise(async (resolve, reject) => {
         try {
             let users = await db.User.findAll({
                 limit: limitInput,
-                where: { roleId: 'R2' }, // R2 là Role của Bác sĩ trong hệ thống
-                order: [['createdAt', 'DESC']], // Sắp xếp theo ngày tạo mới nhất
-                attributes: {
-                    exclude: ['password'] // RẤT QUAN TRỌNG: Không bao giờ trả về mật khẩu
-                },
-                // Kết nối bảng (Join table) để lấy tên Chức danh (Ví dụ: Thạc sĩ, Tiến sĩ)
+                where: { roleId: 'R2' },
+                order: [['createdAt', 'DESC']],
+                attributes: { exclude: ['password'] },
                 include: [
-                    { model: db.Allcode, as: 'positionData', attributes: ['valueEn', 'valueVi'] },
-                    { model: db.Allcode, as: 'genderData', attributes: ['valueEn', 'valueVi'] }
+                    { model: db.allCode, as: 'positionData', attributes: ['value'] },
+                    { model: db.allCode, as: 'genderData', attributes: ['value'] }
                 ],
                 raw: true,
                 nest: true
             });
-
-            resolve({
-                errCode: 0,
-                data: users
-            });
-
-        } catch (e) {
-            reject(e);
-        }
-    })
-}
-
-// Lấy danh sách TẤT CẢ bác sĩ (Dành cho trang Admin chọn bác sĩ)
-let getAllDoctors = () => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            let doctors = await db.User.findAll({
-                where: { roleId: 'R2' },
-                attributes: {
-                    exclude: ['password', 'image'] // Ẩn password và image (vì image ở danh sách dài thường là base64 rất nặng, nhưng bạn dùng Supabase URL thì có thể bỏ 'image' đi)
-                },
-                raw: true
-            });
-
-            resolve({
-                errCode: 0,
-                data: doctors
-            });
-        } catch (e) {
-            reject(e);
-        }
-    })
-}
-
-let saveDetailInforDoctor = (inputData) => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            // 1. Kiểm tra dữ liệu đầu vào (Validate)
-            if (!inputData.doctorId || !inputData.contentHTML || !inputData.contentMarkdown) {
-                resolve({
-                    errCode: 1,
-                    errMessage: 'Missing required parameters!'
-                });
-            } else {
-                // 2. XỬ LÝ BẢNG MARKDOWN (Bài viết giới thiệu)
-                let markdown = await db.Markdown.findOne({
-                    where: { doctorId: inputData.doctorId },
-                    raw: false // Phải để raw: false thì mới dùng hàm .save() được
-                });
-
-                if (markdown) {
-                    // Nếu đã có -> Cập nhật
-                    markdown.contentHTML = inputData.contentHTML;
-                    markdown.contentMarkdown = inputData.contentMarkdown;
-                    markdown.description = inputData.description;
-                    // Cập nhật luôn chuyên khoa và phòng khám (nếu có truyền lên)
-                    markdown.specialtyId = inputData.specialtyId;
-                    markdown.clinicId = inputData.clinicId;
-                    await markdown.save();
-                } else {
-                    // Nếu chưa có -> Tạo mới
-                    await db.Markdown.create({
-                        contentHTML: inputData.contentHTML,
-                        contentMarkdown: inputData.contentMarkdown,
-                        description: inputData.description,
-                        doctorId: inputData.doctorId,
-                        specialtyId: inputData.specialtyId,
-                        clinicId: inputData.clinicId
-                    });
-                }
-
-                // 3. XỬ LÝ BẢNG DOCTOR_INFO (Thông tin giá khám, địa chỉ...)
-                let doctorInfo = await db.Doctor_Info.findOne({
-                    where: { doctorId: inputData.doctorId },
-                    raw: false
-                });
-
-                if (doctorInfo) {
-                    // Cập nhật
-                    doctorInfo.priceId = inputData.priceId;
-                    doctorInfo.provinceId = inputData.provinceId;
-                    doctorInfo.paymentId = inputData.paymentId;
-                    doctorInfo.note = inputData.note;
-                    await doctorInfo.save();
-                } else {
-                    // Tạo mới
-                    await db.Doctor_Info.create({
-                        doctorId: inputData.doctorId,
-                        priceId: inputData.priceId,
-                        provinceId: inputData.provinceId,
-                        paymentId: inputData.paymentId,
-                        note: inputData.note,
-                    });
-                }
-
-                resolve({
-                    errCode: 0,
-                    errMessage: 'Save doctor information succeed!'
-                });
-            }
+            resolve({ errCode: 0, data: users });
         } catch (e) {
             reject(e);
         }
     });
 }
+
+// ============================================================
+// ADMIN: Lấy TẤT CẢ bác sĩ
+// ============================================================
+let getAllDoctors = () => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            let doctors = await db.User.findAll({
+                where: { roleId: 'R2' },
+                attributes: { exclude: ['password', 'image'] },
+                raw: true
+            });
+            resolve({ errCode: 0, data: doctors });
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
+// ============================================================
+// ADMIN: Lưu thông tin chi tiết Bác sĩ (Markdown + Doctor_Info)
+// ============================================================
+let saveDetailInforDoctor = (inputData) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (!inputData.doctorId || !inputData.contentHTML || !inputData.contentMarkdown) {
+                resolve({ errCode: 1, errMessage: 'Missing required parameters!' });
+                return;
+            }
+
+            // 1. Xử lý bảng Markdown
+            let markdown = await db.Markdown.findOne({
+                where: { doctorId: inputData.doctorId },
+                raw: false
+            });
+
+            if (markdown) {
+                markdown.contentHTML = inputData.contentHTML;
+                markdown.contentMarkdown = inputData.contentMarkdown;
+                markdown.description = inputData.description;
+                markdown.specialtyId = inputData.specialtyId;
+                markdown.clinicId = inputData.clinicId;
+                await markdown.save();
+            } else {
+                await db.Markdown.create({
+                    contentHTML: inputData.contentHTML,
+                    contentMarkdown: inputData.contentMarkdown,
+                    description: inputData.description,
+                    doctorId: inputData.doctorId,
+                    specialtyId: inputData.specialtyId,
+                    clinicId: inputData.clinicId
+                });
+            }
+
+            // 2. Xử lý bảng Doctor_Info
+            let doctorInfo = await db.Doctor_Info.findOne({
+                where: { doctorId: inputData.doctorId },
+                raw: false
+            });
+
+            if (doctorInfo) {
+                doctorInfo.priceId = inputData.priceId;
+                doctorInfo.provinceId = inputData.provinceId;
+                doctorInfo.paymentId = inputData.paymentId;
+                doctorInfo.note = inputData.note;
+                await doctorInfo.save();
+            } else {
+                await db.Doctor_Info.create({
+                    doctorId: inputData.doctorId,
+                    priceId: inputData.priceId,
+                    provinceId: inputData.provinceId,
+                    paymentId: inputData.paymentId,
+                    note: inputData.note,
+                });
+            }
+
+            resolve({ errCode: 0, errMessage: 'Save doctor information succeed!' });
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
+// ============================================================
+// W8: Lấy thông tin đầy đủ Bác sĩ (Profile, Province, Clinic)
+// ============================================================
 let getProfileDoctorById = (inputId) => {
     return new Promise(async (resolve, reject) => {
         try {
             if (!inputId) {
                 resolve({ errCode: 1, errMessage: 'Missing required parameter' });
-            } else {
-                let data = await db.User.findOne({
-                    where: { id: inputId },
-                    attributes: { exclude: ['password'] }, // Không lấy password bảo mật
-                    include: [
-                        // 1. Lấy thông tin bài viết (Mô tả, HTML)
-                        { model: db.Markdown, attributes: ['description', 'contentHTML', 'contentMarkdown'] },
-                        // 2. Lấy thông tin chức danh (Allcode)
-                        { model: db.allCode, as: 'positionData', attributes: ['value'] },
-                        // 3. Lấy thông tin Giá khám, Tỉnh thành, Phòng khám (Doctor_Info)
-                        { model: db.Doctor_Info, attributes: { exclude: ['id', 'doctorId'] } }
-                    ],
-                    raw: false,
-                    nest: true
-                });
-
-                if (data && data.image) {
-                    data.image = new Buffer(data.image, 'base64').toString('binary');
-                }
-
-                if (!data) data = {};
-
-                resolve({ errCode: 0, data: data });
+                return;
             }
+
+            let data = await db.User.findOne({
+                where: { id: inputId },
+                attributes: { exclude: ['password'] },
+                include: [
+                    {
+                        model: db.Markdown,
+                        attributes: ['description', 'contentHTML', 'contentMarkdown', 'clinicId', 'specialtyId']
+                    },
+                    {
+                        model: db.allCode,
+                        as: 'positionData',
+                        attributes: ['value']
+                    },
+                    {
+                        model: db.Doctor_Info,
+                        attributes: { exclude: ['id', 'doctorId'] },
+                        include: [
+                            { model: db.allCode, as: 'priceData', attributes: ['value'] },
+                            { model: db.allCode, as: 'provinceData', attributes: ['value'] },
+                            { model: db.allCode, as: 'paymentData', attributes: ['value'] },
+                        ]
+                    }
+                ],
+                raw: false,
+                nest: true
+            });
+
+            if (!data) {
+                resolve({ errCode: 0, data: {} });
+                return;
+            }
+
+            let plainData = data.get({ plain: true });
+
+            // Lấy thêm thông tin Phòng khám nếu có clinicId
+            if (plainData.Markdown && plainData.Markdown.clinicId) {
+                let clinic = await db.Clinic.findOne({
+                    where: { id: plainData.Markdown.clinicId },
+                    attributes: ['id', 'name', 'address', 'image'],
+                    raw: true
+                });
+                plainData.clinicData = clinic || null;
+            } else {
+                plainData.clinicData = null;
+            }
+
+            resolve({ errCode: 0, data: plainData });
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
+// ============================================================
+// W9: Lưu lịch khám hàng loạt (Bác sĩ tạo lịch rảnh)
+// ============================================================
+let bulkCreateSchedule = (data) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (!data.schedules || !data.doctorId || !data.date) {
+                resolve({ errCode: 1, errMessage: 'Missing required parameters!' });
+                return;
+            }
+
+            if (data.schedules.length === 0) {
+                resolve({ errCode: 2, errMessage: 'No schedules to save!' });
+                return;
+            }
+
+            // Xóa lịch cũ của ngày đó trước khi tạo mới
+            const Op = db.Sequelize.Op;
+            let dateStart = new Date(+data.date);
+            dateStart.setHours(0, 0, 0, 0);
+            let dateEnd = new Date(+data.date);
+            dateEnd.setHours(23, 59, 59, 999);
+
+            await db.Schedule.destroy({
+                where: {
+                    doctorId: data.doctorId,
+                    date: { [Op.between]: [dateStart, dateEnd] }
+                }
+            });
+
+            // Tạo lịch mới với maxNumber mặc định = 10
+            let newSchedules = data.schedules.map(item => ({
+                doctorId: item.doctorId,
+                date: new Date(+item.date),
+                timeType: item.timeType,
+                maxNumber: 1,
+                currentNumber: 0
+            }));
+
+            await db.Schedule.bulkCreate(newSchedules);
+
+            resolve({ errCode: 0, errMessage: 'Save schedule succeed!' });
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
+// ============================================================
+// W9: Lấy lịch rảnh của Bác sĩ theo ngày (Bệnh nhân xem)
+// ============================================================
+let getScheduleByDate = (doctorId, date) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (!doctorId || !date) {
+                resolve({ errCode: 1, errMessage: 'Missing required parameters!' });
+                return;
+            }
+
+            // Query theo khoảng thời gian trong ngày để tránh lỗi timezone
+            const Op = db.Sequelize.Op;
+            let dateStart = new Date(+date);
+            dateStart.setHours(0, 0, 0, 0);
+            let dateEnd = new Date(+date);
+            dateEnd.setHours(23, 59, 59, 999);
+
+            let data = await db.Schedule.findAll({
+                where: {
+                    doctorId: doctorId,
+                    date: { [Op.between]: [dateStart, dateEnd] },
+                    // Chỉ hiển thị slot còn chỗ
+                    currentNumber: { [Op.lt]: db.Sequelize.col('maxNumber') }
+                },
+                include: [
+                    {
+                        model: db.allCode,
+                        as: 'timeTypeData',
+                        attributes: ['value', 'keyMap']
+                    }
+                ],
+                raw: false,
+                nest: true
+            });
+
+            if (!data) data = [];
+
+            resolve({ errCode: 0, data: data });
         } catch (e) {
             reject(e);
         }
@@ -160,8 +265,10 @@ let getProfileDoctorById = (inputId) => {
 }
 
 module.exports = {
-    getTopDoctorHome: getTopDoctorHome,
-    getAllDoctors: getAllDoctors,
-    saveDetailInforDoctor: saveDetailInforDoctor,
-    getProfileDoctorById: getProfileDoctorById
+    getTopDoctorHome,
+    getAllDoctors,
+    saveDetailInforDoctor,
+    getProfileDoctorById,
+    bulkCreateSchedule,
+    getScheduleByDate,
 }

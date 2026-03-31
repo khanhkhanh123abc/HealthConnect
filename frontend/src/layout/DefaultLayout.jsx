@@ -8,7 +8,7 @@ const DefaultLayout = ({ children }) => {
             <Header />
 
             {/* Nội dung các trang sẽ thay đổi tại đây */}
-            <main className="container mx-auto px-4 py-8">
+            <main className="container mx-auto px-4 py-8 pt-24">
                 {children}
             </main>
         </div>

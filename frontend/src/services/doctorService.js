@@ -1,28 +1,38 @@
 import axios from '../utils/axios';
 
-// ==========================================
-// NHÓM 1: HIỂN THỊ DỮ LIỆU (GET)
-// ==========================================
-
+// ---- TRANG CHỦ ----
 const getTopDoctorHomeService = (limit) => {
     return axios.get(`/api/top-doctor-home?limit=${limit}`);
 };
 
+// ---- DANH SÁCH BÁC SĨ ----
 const getAllDoctorsService = () => {
     return axios.get(`/api/get-all-doctors`);
 };
 
-const getDetailInforDoctor = (inputId) => {
-    return axios.get(`/api/get-detail-doctor-by-id?id=${inputId}`);
+// Alias cho ManageSchedule (dùng tên ngắn hơn)
+const getAllDoctors = () => {
+    return axios.get(`/api/get-all-doctors`);
 };
 
+// ---- PROFILE BÁC SĨ CHI TIẾT ----
+const getProfileDoctorById = (doctorId) => {
+    return axios.get(`/api/get-profile-doctor-by-id?doctorId=${doctorId}`);
+};
+
+// ---- LỊCH KHÁM ----
 const getScheduleDoctorByDate = (doctorId, date) => {
     return axios.get(`/api/get-schedule-doctor-by-date?doctorId=${doctorId}&date=${date}`);
 };
 
-// ==========================================
-// NHÓM 2: QUẢN LÝ BÁC SĨ (CREATE, UPDATE, DELETE)
-// ==========================================
+const saveBulkScheduleDoctor = (data) => {
+    return axios.post(`/api/bulk-create-schedule`, data);
+};
+
+// ---- ADMIN: QUẢN LÝ BÁC SĨ ----
+const saveDetailDoctorService = (data) => {
+    return axios.post(`/api/save-info-doctors`, data);
+};
 
 const createNewDoctorService = (data) => {
     return axios.post(`/api/create-new-doctor`, data);
@@ -33,37 +43,18 @@ const editDoctorService = (data) => {
 };
 
 const deleteDoctorService = (doctorId) => {
-    // Lưu ý: Phương thức DELETE trong Axios truyền data khác với POST/PUT
-    return axios.delete(`/api/delete-doctor`, {
-        data: { id: doctorId }
-    });
+    return axios.delete(`/api/delete-doctor`, { data: { id: doctorId } });
 };
-
-// ==========================================
-// NHÓM 3: TÍNH NĂNG MỞ RỘNG (MARKDOWN & LỊCH KHÁM)
-// ==========================================
-
-const saveDetailDoctorService = (data) => {
-    return axios.post(`/api/save-info-doctors`, data);
-};
-
-const saveBulkScheduleDoctor = (data) => {
-    return axios.post(`/api/bulk-create-schedule`, data);
-};
-
-const getProfileDoctorById = (doctorId) => {
-    return axios.get(`/api/get-profile-doctor-by-id?doctorId=${doctorId}`);
-}
 
 export {
     getTopDoctorHomeService,
     getAllDoctorsService,
-    getDetailInforDoctor,
+    getAllDoctors,
+    getProfileDoctorById,
     getScheduleDoctorByDate,
+    saveBulkScheduleDoctor,
+    saveDetailDoctorService,
     createNewDoctorService,
     editDoctorService,
     deleteDoctorService,
-    saveDetailDoctorService,
-    saveBulkScheduleDoctor,
-    getProfileDoctorById
 };

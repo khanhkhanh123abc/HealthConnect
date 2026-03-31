@@ -9,8 +9,6 @@ const Doctor = () => {
             <Routes>
                 <Route path="manage-schedule" element={<ManageSchedule />} />
                 <Route path="manage-patient" element={<ManagePatient />} />
-
-                {/* Default route */}
                 <Route path="/" element={<Navigate to="manage-schedule" />} />
             </Routes>
         </div>

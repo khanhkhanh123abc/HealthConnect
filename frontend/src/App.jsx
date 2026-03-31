@@ -9,6 +9,7 @@ import Home from './pages/Home';
 import System from './pages/System/System';
 import Doctor from './pages/Doctor/Doctor';
 import DefaultLayout from './layout/DefaultLayout';
+import DoctorDetail from './pages/System/Doctor/DoctorDetail';
 
 function App() {
   const { isLoggedIn, userInfo } = useSelector((state) => state.user);
@@ -22,6 +23,16 @@ function App() {
 
               {/* HOME */}
               <Route path="/home" element={<Home />} />
+
+              {/* W8: TRANG CHI TIẾT BÁC SĨ (Public - ai cũng xem được) */}
+              <Route
+                path="/doctor-profile/:id"
+                element={
+                  <DefaultLayout>
+                    <DoctorDetail />
+                  </DefaultLayout>
+                }
+              />
 
               {/* LOGIN */}
               <Route
@@ -43,7 +54,7 @@ function App() {
                 }
               />
 
-              {/* ADMIN ROUTE */}
+              {/* ADMIN ROUTES */}
               <Route
                 path="/system/*"
                 element={
@@ -57,7 +68,7 @@ function App() {
                 }
               />
 
-              {/* DOCTOR ROUTE */}
+              {/* DOCTOR ROUTES */}
               <Route
                 path="/doctor/*"
                 element={

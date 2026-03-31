@@ -5,11 +5,7 @@ let createClinic = async (req, res) => {
         let info = await clinicService.createClinic(req.body);
         return res.status(200).json(info);
     } catch (e) {
-        console.log(e);
-        return res.status(200).json({
-            errCode: -1,
-            errMessage: 'Error from server...'
-        });
+        return res.status(200).json({ errCode: -1, errMessage: 'Error from server...' });
     }
 }
 let getAllClinics = async (req, res) => {
@@ -17,13 +13,32 @@ let getAllClinics = async (req, res) => {
         let info = await clinicService.getAllClinics();
         return res.status(200).json(info);
     } catch (e) {
-        console.log(e);
         return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
     }
 }
-// Nhớ export
-
-module.exports = {
-    createClinic: createClinic,
-    getAllClinics: getAllClinics
+let getClinicById = async (req, res) => {
+    try {
+        let info = await clinicService.getClinicById(req.query.id);
+        return res.status(200).json(info);
+    } catch (e) {
+        return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
+    }
 }
+let updateClinic = async (req, res) => {
+    try {
+        let info = await clinicService.updateClinic(req.body);
+        return res.status(200).json(info);
+    } catch (e) {
+        return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
+    }
+}
+let deleteClinic = async (req, res) => {
+    try {
+        let info = await clinicService.deleteClinic(req.query.id);
+        return res.status(200).json(info);
+    } catch (e) {
+        return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
+    }
+}
+
+module.exports = { createClinic, getAllClinics, getClinicById, updateClinic, deleteClinic }

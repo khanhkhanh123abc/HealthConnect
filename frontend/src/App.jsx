@@ -10,6 +10,8 @@ import System from './pages/System/System';
 import Doctor from './pages/Doctor/Doctor';
 import DefaultLayout from './layout/DefaultLayout';
 import DoctorDetail from './pages/System/Doctor/DoctorDetail';
+import MyBookings from './pages/MyBookings';
+import ConfirmBooking from './pages/ConfirmBooking';
 
 function App() {
   const { isLoggedIn, userInfo } = useSelector((state) => state.user);
@@ -21,74 +23,50 @@ function App() {
           <main className="content-container">
             <Routes>
 
-              {/* HOME */}
               <Route path="/home" element={<Home />} />
 
-              {/* W8: TRANG CHI TIẾT BÁC SĨ (Public - ai cũng xem được) */}
-              <Route
-                path="/doctor-profile/:id"
-                element={
-                  <DefaultLayout>
-                    <DoctorDetail />
-                  </DefaultLayout>
-                }
-              />
+              {/* Trang chi tiết bác sĩ */}
+              <Route path="/doctor-profile/:id" element={
+                <DefaultLayout><DoctorDetail /></DefaultLayout>
+              }/>
 
-              {/* LOGIN */}
-              <Route
-                path="/login"
-                element={
-                  !isLoggedIn ? (
-                    <Login />
-                  ) : (
-                    <Navigate
-                      to={
-                        userInfo?.roleId === 'R1'
-                          ? '/system'
-                          : userInfo?.roleId === 'R2'
-                            ? '/doctor'
-                            : '/home'
-                      }
-                    />
-                  )
-                }
-              />
+              {/* Lịch hẹn của bệnh nhân */}
+              <Route path="/my-bookings" element={
+                isLoggedIn
+                  ? <DefaultLayout><MyBookings /></DefaultLayout>
+                  : <Navigate to="/login" />
+              }/>
 
-              {/* ADMIN ROUTES */}
-              <Route
-                path="/system/*"
-                element={
-                  isLoggedIn && userInfo?.roleId === 'R1' ? (
-                    <DefaultLayout>
-                      <System />
-                    </DefaultLayout>
-                  ) : (
-                    <Navigate to="/login" />
-                  )
-                }
-              />
+              {/* Xác nhận lịch qua email - PUBLIC, không cần đăng nhập */}
+              <Route path="/confirm-booking" element={<ConfirmBooking />} />
 
-              {/* DOCTOR ROUTES */}
-              <Route
-                path="/doctor/*"
-                element={
-                  isLoggedIn && userInfo?.roleId === 'R2' ? (
-                    <DefaultLayout>
-                      <Doctor />
-                    </DefaultLayout>
-                  ) : (
-                    <Navigate to="/login" />
-                  )
-                }
-              />
+              <Route path="/login" element={
+                !isLoggedIn ? <Login /> : (
+                  <Navigate to={
+                    userInfo?.roleId === 'R1' ? '/system'
+                    : userInfo?.roleId === 'R2' ? '/doctor'
+                    : '/home'
+                  }/>
+                )
+              }/>
 
-              {/* DEFAULT */}
+              <Route path="/system/*" element={
+                isLoggedIn && userInfo?.roleId === 'R1'
+                  ? <DefaultLayout><System /></DefaultLayout>
+                  : <Navigate to="/login" />
+              }/>
+
+              <Route path="/doctor/*" element={
+                isLoggedIn && userInfo?.roleId === 'R2'
+                  ? <DefaultLayout><Doctor /></DefaultLayout>
+                  : <Navigate to="/login" />
+              }/>
+
               <Route path="/" element={<Navigate to="/home" />} />
               <Route path="*" element={<Navigate to="/home" />} />
 
             </Routes>
           </main>
-
           <ToastContainer position="bottom-right" autoClose={3000} />
         </div>
       </Router>

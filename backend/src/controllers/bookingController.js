@@ -1,25 +1,42 @@
 import bookingService from '../services/bookingService';
 
-// Bệnh nhân đặt lịch
 let createBooking = async (req, res) => {
     try {
         let info = await bookingService.createBooking(req.body);
         return res.status(200).json(info);
     } catch (e) {
-        console.error('createBooking controller error:', e);
-        return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
+        return res.status(200).json({ errCode: -1, errMessage: 'Lỗi máy chủ, vui lòng thử lại!' });
     }
 }
 
-// Bệnh nhân xem lịch sử đặt lịch
+let confirmBooking = async (req, res) => {
+    try {
+        let info = await bookingService.confirmBookingByToken(req.query.token);
+        return res.status(200).json(info);
+    } catch (e) {
+        return res.status(200).json({ errCode: -1, errMessage: 'Lỗi máy chủ!' });
+    }
+}
+
 let getBookingsByPatient = async (req, res) => {
-try {
+    try {
         let info = await bookingService.getBookingsByPatient(req.query.patientId);
         return res.status(200).json(info);
     } catch (e) {
         return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
     }
 }
+
+let cancelBooking = async (req, res) => {
+    try {
+        let { bookingId, patientId } = req.body;
+        let info = await bookingService.cancelBooking(bookingId, patientId);
+        return res.status(200).json(info);
+    } catch (e) {
+        return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
+    }
+}
+
 let getScheduleWithSlots = async (req, res) => {
     try {
         let info = await bookingService.getScheduleWithSlots(req.query.doctorId, req.query.date);
@@ -29,8 +46,4 @@ let getScheduleWithSlots = async (req, res) => {
     }
 }
 
-module.exports = {
-    createBooking,
-    getBookingsByPatient,
-    getScheduleWithSlots
-}
+module.exports = { createBooking, confirmBooking, getBookingsByPatient, cancelBooking, getScheduleWithSlots }

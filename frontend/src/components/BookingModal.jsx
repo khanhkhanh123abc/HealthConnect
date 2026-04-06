@@ -26,13 +26,13 @@ const BookingModal = ({ isOpen, onClose, bookingInfo }) => {
         console.log("userInfo.id:", userInfo?.id);
         if (isSubmitting || isSuccess) return; // Chặn double-click
         if (!isLoggedIn || !userInfo) {
-            toast.error("Vui lòng đăng nhập để đặt lịch!");
+            toast.error("Please log in to book an appointment!");
             return;
         }
 
         const patientId = userInfo.id || userInfo.userId || null;
         if (!patientId) {
-            toast.error("Không xác định được tài khoản. Vui lòng đăng nhập lại!");
+            toast.error("Unable to identify the account. Please log in again!");
             return;
         }
 
@@ -53,7 +53,7 @@ const BookingModal = ({ isOpen, onClose, bookingInfo }) => {
 
             if (errCode === 0) {
                 setIsSuccess(true); // Đánh dấu đã thành công, không cho submit lại
-                toast.success("Đặt lịch thành công! Bác sĩ sẽ xác nhận sớm.");
+                toast.success("Appointment booked successfully! The doctor will confirm soon.");
                 setReason('');
                 setTimeout(() => {
                     onClose();
@@ -61,13 +61,13 @@ const BookingModal = ({ isOpen, onClose, bookingInfo }) => {
                 }, 1500);
             } else {
                 // Hiện đúng thông báo lỗi theo errCode
-                const msg = ERROR_MESSAGES[errCode] || errMessage || 'Đặt lịch thất bại!';
+                const msg = ERROR_MESSAGES[errCode] || errMessage || 'Failed to book appointment!';
                 toast.error(msg);
                 setIsSubmitting(false); // Cho phép thử lại nếu lỗi
             }
         } catch (error) {
-            console.error('Lỗi đặt lịch:', error);
-            toast.error("Lỗi kết nối máy chủ!");
+            console.error('Error booking appointment:', error);
+            toast.error("Server connection error!");
             setIsSubmitting(false);
         }
     };

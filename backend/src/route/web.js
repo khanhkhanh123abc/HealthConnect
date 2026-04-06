@@ -47,9 +47,11 @@ let initWebRoutes = (app) => {
 
     // Booking
     router.post('/api/create-booking', bookingController.createBooking);
+    router.get('/api/confirm-booking', bookingController.confirmBooking);
     router.get('/api/get-bookings-by-patient', bookingController.getBookingsByPatient);
+    router.put('/api/cancel-booking', bookingController.cancelBooking);
     router.get('/api/get-schedule-with-slots', bookingController.getScheduleWithSlots);
-
+    
     return app.use('/', router);
 }
 

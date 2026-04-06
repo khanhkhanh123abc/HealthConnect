@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { processLogout } from "../../store/slices/userSlice";
 import logo from '../../assets/logo.svg';
 
+
 const HomeHeader = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
@@ -43,6 +44,14 @@ const HomeHeader = () => {
                 <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
                     <Link to="/doctor/manage-schedule" className="hover:text-indigo-600 uppercase transition-colors">Schedule</Link>
                     <Link to="/doctor/manage-patient" className="hover:text-indigo-600 uppercase transition-colors">Patients</Link>
+                </div>
+            );
+        }
+        if (isLoggedIn && userInfo?.roleId === 'R3') {
+            return (
+                <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
+                    <Link to="/home" className="hover:text-indigo-600 uppercase transition-colors">Home</Link>
+                    <Link to="/my-bookings" className="text-sm font-medium text-indigo-600 hover:underline">My Bookings</Link>
                 </div>
             );
         }

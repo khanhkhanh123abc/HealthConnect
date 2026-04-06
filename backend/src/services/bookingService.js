@@ -48,7 +48,9 @@ let createBooking = (data) => {
             }
 
             const BookingModel = db.Booking || db.Bookings;
-            let existingBooking = await BookingModel.findOne({
+
+            // Kiểm tra booking đang active (S1/S2) → không cho đặt trùng
+            let activeBooking = await BookingModel.findOne({
                 where: {
                     patientId: data.patientId,
                     doctorId: data.doctorId,
@@ -59,24 +61,46 @@ let createBooking = (data) => {
                 transaction: t
             });
 
-            if (existingBooking) {
+            if (activeBooking) {
                 await t.rollback();
                 resolve({ errCode: 4, errMessage: 'Bạn đã đặt lịch khám cho khung giờ này rồi!' });
                 return;
             }
 
-            // Tạo token xác nhận (unique)
+            // ✅ Kiểm tra có booking đã hủy (S4) không → reuse thay vì insert mới
+            // (tránh lỗi UNIQUE constraint nếu vẫn còn)
+            let cancelledBooking = await BookingModel.findOne({
+                where: {
+                    patientId: data.patientId,
+                    doctorId: data.doctorId,
+                    date: { [Op.between]: [dateStart, dateEnd] },
+                    timeType: data.timeType,
+                    statusId: 'S4'
+                },
+                transaction: t,
+                raw: false
+            });
+
             const confirmToken = uuidv4();
 
-            let newBooking = await BookingModel.create({
-                statusId: 'S1',
-                doctorId: data.doctorId,
-                patientId: data.patientId,
-                date: new Date(+data.date),
-                timeType: data.timeType,
-                reason: data.reason || '',
-                token: confirmToken
-            }, { transaction: t });
+            if (cancelledBooking) {
+                // Update booking đã hủy → S1 mới
+                cancelledBooking.statusId = 'S1';
+                cancelledBooking.reason = data.reason || '';
+                cancelledBooking.token = confirmToken;
+                await cancelledBooking.save({ transaction: t });
+            } else {
+                // Tạo booking mới
+                await BookingModel.create({
+                    statusId: 'S1',
+                    doctorId: data.doctorId,
+                    patientId: data.patientId,
+                    date: new Date(+data.date),
+                    timeType: data.timeType,
+                    reason: data.reason || '',
+                    token: confirmToken
+                }, { transaction: t });
+            }
 
             schedule.currentNumber += 1;
             await schedule.save({ transaction: t });

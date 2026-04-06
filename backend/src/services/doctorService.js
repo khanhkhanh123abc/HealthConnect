@@ -18,6 +18,15 @@ let getTopDoctorHome = (limitInput) => {
                 raw: true,
                 nest: true
             });
+
+            // ✅ Deduplicate theo id
+            const seen = new Set();
+            users = users.filter(u => {
+                if (seen.has(u.id)) return false;
+                seen.add(u.id);
+                return true;
+            });
+
             resolve({ errCode: 0, data: users });
         } catch (e) {
             reject(e);
@@ -201,12 +210,13 @@ let bulkCreateSchedule = (data) => {
                 }
             });
 
-            // Tạo lịch mới với maxNumber mặc định = 10
+            // Tạo lịch mới với maxNumber từ input (mặc định 1 nếu không truyền)
+            const maxNumber = data.maxNumber && data.maxNumber > 0 ? +data.maxNumber : 1;
             let newSchedules = data.schedules.map(item => ({
                 doctorId: item.doctorId,
                 date: new Date(+item.date),
                 timeType: item.timeType,
-                maxNumber: 1,
+                maxNumber: maxNumber,
                 currentNumber: 0
             }));
 
@@ -264,6 +274,91 @@ let getScheduleByDate = (doctorId, date) => {
     });
 }
 
+// ============================================================
+// BOOKING FLOW: Lấy Phòng khám theo Chuyên khoa
+// Logic: Markdowns lưu specialtyId + clinicId của từng bác sĩ
+// → Tìm tất cả clinicId có bác sĩ thuộc specialtyId đó
+// ============================================================
+let getClinicsBySpecialty = (specialtyId) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (!specialtyId) {
+                resolve({ errCode: 1, errMessage: 'Missing specialtyId' });
+                return;
+            }
+            // Lấy tất cả clinicId từ bảng Markdowns theo specialtyId
+            let markdowns = await db.Markdown.findAll({
+                where: { specialtyId },
+                attributes: ['clinicId'],
+                raw: true
+            });
+            const clinicIds = [...new Set(
+                markdowns.map(m => m.clinicId).filter(id => id)
+            )];
+            if (clinicIds.length === 0) {
+                resolve({ errCode: 0, data: [] });
+                return;
+            }
+            // Lấy thông tin các phòng khám
+            let clinics = await db.Clinic.findAll({
+                where: { id: clinicIds },
+                attributes: ['id', 'name', 'image', 'address'],
+                raw: true
+            });
+            resolve({ errCode: 0, data: clinics });
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
+// ============================================================
+// BOOKING FLOW: Lấy Bác sĩ theo Phòng khám + Chuyên khoa
+// ============================================================
+let getDoctorsByClinicAndSpecialty = (clinicId, specialtyId) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (!clinicId || !specialtyId) {
+                resolve({ errCode: 1, errMessage: 'Missing parameters' });
+                return;
+            }
+            // Tìm doctorId từ Markdowns theo clinicId + specialtyId
+            let markdowns = await db.Markdown.findAll({
+                where: { clinicId, specialtyId },
+                attributes: ['doctorId', 'description'],
+                raw: true
+            });
+            if (markdowns.length === 0) {
+                resolve({ errCode: 0, data: [] });
+                return;
+            }
+            const doctorIds = markdowns.map(m => m.doctorId);
+            const descMap = {};
+            markdowns.forEach(m => { descMap[m.doctorId] = m.description; });
+
+            // Lấy thông tin bác sĩ
+            let doctors = await db.User.findAll({
+                where: { id: doctorIds, roleId: 'R2' },
+                attributes: ['id', 'firstName', 'lastName', 'image'],
+                include: [
+                    { model: db.allCode, as: 'positionData', attributes: ['value'] }
+                ],
+                raw: true,
+                nest: true
+            });
+
+            let result = doctors.map(doc => ({
+                ...doc,
+                description: descMap[doc.id] || ''
+            }));
+
+            resolve({ errCode: 0, data: result });
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
+
 module.exports = {
     getTopDoctorHome,
     getAllDoctors,
@@ -271,4 +366,6 @@ module.exports = {
     getProfileDoctorById,
     bulkCreateSchedule,
     getScheduleByDate,
+    getClinicsBySpecialty,
+    getDoctorsByClinicAndSpecialty,
 }

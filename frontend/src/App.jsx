@@ -12,6 +12,7 @@ import DefaultLayout from './layout/DefaultLayout';
 import DoctorDetail from './pages/System/Doctor/DoctorDetail';
 import MyBookings from './pages/MyBookings';
 import ConfirmBooking from './pages/ConfirmBooking';
+import BookingPage from './pages/BookingPage';
 
 function App() {
   const { isLoggedIn, userInfo } = useSelector((state) => state.user);
@@ -39,6 +40,11 @@ function App() {
 
               {/* Xác nhận lịch qua email - PUBLIC, không cần đăng nhập */}
               <Route path="/confirm-booking" element={<ConfirmBooking />} />
+
+              {/* Trang đặt lịch 4 bước - PUBLIC */}
+              <Route path="/booking" element={
+                <DefaultLayout><BookingPage /></DefaultLayout>
+              }/>
 
               <Route path="/login" element={
                 !isLoggedIn ? <Login /> : (

@@ -5,6 +5,10 @@ import initWebRoutes from './route/web.js';
 import connectDB from './config/connectDB.js';
 import 'dotenv/config';
 import cors from 'cors';
+import { startAutoCancelCron } from './services/cronService.js';
+
+startAutoCancelCron();
+
 
 let app = express();
 app.use(bodyParser.json());

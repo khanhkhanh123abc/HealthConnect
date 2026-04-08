@@ -2,27 +2,27 @@ import nodemailer from 'nodemailer';
 
 // ===== CẤU HÌNH NODEMAILER =====
 let transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_APP,
-        pass: process.env.EMAIL_APP_PASSWORD
-    }
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_APP,
+    pass: process.env.EMAIL_APP_PASSWORD
+  }
 });
 
 // ===== HTML EMAIL TEMPLATE =====
 let buildBookingEmailHTML = (data) => {
-    const {
-        patientName,
-        doctorName,
-        timeValue,
-        dateStr,
-        clinicName,
-        clinicAddress,
-        reason,
-        confirmLink
-    } = data;
+  const {
+    patientName,
+    doctorName,
+    timeValue,
+    dateStr,
+    clinicName,
+    clinicAddress,
+    reason,
+    confirmLink
+  } = data;
 
-    return `
+  return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -198,26 +198,26 @@ let buildBookingEmailHTML = (data) => {
 
 // ===== GỬI EMAIL ĐẶT LỊCH =====
 let sendBookingConfirmEmail = async (data) => {
-    try {
-        const html = buildBookingEmailHTML(data);
-        await transporter.sendMail({
-            from: `"HealthConnect" <${process.env.EMAIL_APP}>`,
-            to: data.patientEmail,
-            subject: `[HealthConnect] Xác nhận lịch khám - ${data.dateStr}`,
-            html
-        });
-        console.log(`Email sent to ${data.patientEmail}`);
-        return true;
-    } catch (e) {
-        console.error('Send email error:', e.message);
-        return false; // Không throw - lỗi email không nên block booking
-    }
+  try {
+    const html = buildBookingEmailHTML(data);
+    await transporter.sendMail({
+      from: `"HealthConnect" <${process.env.EMAIL_APP}>`,
+      to: data.patientEmail,
+      subject: `[HealthConnect] Xác nhận lịch khám - ${data.dateStr}`,
+      html
+    });
+    console.log(`Email sent to ${data.patientEmail}`);
+    return true;
+  } catch (e) {
+    console.error('Send email error:', e.message);
+    return false; // Không throw - lỗi email không nên block booking
+  }
 };
 
 // ===== GỬI EMAIL KHI HỦY LỊCH =====
 let sendCancelEmail = async (data) => {
-    try {
-        const html = `
+  try {
+    const html = `
 <!DOCTYPE html>
 <html lang="vi">
 <body style="font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:40px 20px;">
@@ -252,17 +252,67 @@ let sendCancelEmail = async (data) => {
 </body>
 </html>`;
 
-        await transporter.sendMail({
-            from: `"HealthConnect" <${process.env.EMAIL_APP}>`,
-            to: data.patientEmail,
-            subject: `[HealthConnect] Lịch khám đã hủy - ${data.dateStr}`,
-            html
-        });
-        return true;
-    } catch (e) {
-        console.error('Send cancel email error:', e.message);
-        return false;
-    }
+    await transporter.sendMail({
+      from: `"HealthConnect" <${process.env.EMAIL_APP}>`,
+      to: data.patientEmail,
+      subject: `[HealthConnect] Lịch khám đã hủy - ${data.dateStr}`,
+      html
+    });
+    return true;
+  } catch (e) {
+    console.error('Send cancel email error:', e.message);
+    return false;
+  }
+};
+let sendMedicalRecordEmail = async (data) => {
+  try {
+    const html = `
+<!DOCTYPE html>
+<html lang="vi">
+<body style="font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:40px 20px;">
+  <table width="600" cellpadding="0" cellspacing="0"
+    style="background:#fff;border-radius:16px;overflow:hidden;margin:0 auto;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <tr>
+      <td style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:30px 40px;text-align:center;">
+        <h1 style="margin:0;color:#fff;font-size:22px;">HealthConnect</h1>
+        <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Hồ sơ khám bệnh điện tử</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:30px 40px;">
+        <p style="color:#374151;font-size:15px;margin:0 0 8px;">
+          Xin chào <strong>${data.patientName}</strong>,
+        </p>
+        <p style="color:#6b7280;font-size:14px;margin:0 0 20px;line-height:1.7;">
+          <strong>${data.doctorName}</strong> đã gửi cho bạn hồ sơ/đơn thuốc sau buổi khám (Mã lịch: #${data.bookingId}):
+        </p>
+        <div style="background:#f8fafc;border-left:4px solid #4f46e5;border-radius:8px;padding:20px 24px;white-space:pre-wrap;font-family:monospace;font-size:13px;color:#1f2937;line-height:1.8;">
+${data.content}
+        </div>
+        <p style="color:#9ca3af;font-size:12px;margin:20px 0 0;text-align:center;">
+          Vui lòng lưu giữ hồ sơ này. Liên hệ phòng khám nếu có thắc mắc.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 40px;text-align:center;">
+        <p style="margin:0;color:#9ca3af;font-size:12px;">Email tự động từ HealthConnect.</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+    await transporter.sendMail({
+      from: `"HealthConnect" <${process.env.EMAIL_APP}>`,
+      to: data.patientEmail,
+      subject: `[HealthConnect] Hồ sơ khám bệnh - ${data.doctorName}`,
+      html
+    });
+    return true;
+  } catch (e) {
+    console.error('Send medical record email error:', e.message);
+    return false;
+  }
 };
 
-module.exports = { sendBookingConfirmEmail, sendCancelEmail };
+module.exports = { sendBookingConfirmEmail, sendCancelEmail, sendMedicalRecordEmail };

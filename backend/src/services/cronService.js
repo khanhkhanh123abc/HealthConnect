@@ -115,7 +115,7 @@ const startAutoCancelCron = () => {
     cron.schedule('* * * * *', async () => {
         try {
             const BookingModel = db.Booking || db.Bookings;
-            const tenMinutesAgo = new Date(Date.now() - 1 * 60 * 1000);
+            const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
 
             const expiredBookings = await BookingModel.findAll({
                 where: {

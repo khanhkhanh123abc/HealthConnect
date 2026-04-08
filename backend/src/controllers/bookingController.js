@@ -10,6 +10,7 @@ let createBooking = async (req, res) => {
 }
 
 let confirmBooking = async (req, res) => {
+    console.log('=== CONFIRM TOKEN:', req.query.token, '===');
     try {
         let info = await bookingService.confirmBookingByToken(req.query.token);
         return res.status(200).json(info);
@@ -45,5 +46,35 @@ let getScheduleWithSlots = async (req, res) => {
         return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
     }
 }
+let getBookingsByDoctor = async (req, res) => {
+    try {
+        let info = await bookingService.getBookingsByDoctor(
+            req.query.doctorId,
+            req.query.weekStart
+        );
+        return res.status(200).json(info);
+    } catch (e) {
+        return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
+    }
+}
 
-module.exports = { createBooking, confirmBooking, getBookingsByPatient, cancelBooking, getScheduleWithSlots }
+let completeBooking = async (req, res) => {
+    try {
+        let { bookingId, doctorId } = req.body;
+        let info = await bookingService.completeBooking(bookingId, doctorId);
+        return res.status(200).json(info);
+    } catch (e) {
+        return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
+    }
+}
+
+let sendMedicalRecord = async (req, res) => {
+    try {
+        let { bookingId, doctorId, content } = req.body;
+        let info = await bookingService.sendMedicalRecord(bookingId, doctorId, content);
+        return res.status(200).json(info);
+    } catch (e) {
+        return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
+    }
+}
+module.exports = { createBooking, confirmBooking, getBookingsByPatient, cancelBooking, getScheduleWithSlots, getBookingsByDoctor, completeBooking, sendMedicalRecord }

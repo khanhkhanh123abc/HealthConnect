@@ -19,10 +19,17 @@
     "dialect": "mysql"
   },
   "production": {
-    "username": "root",
+    "username": "avnadmin",
     "password": null,
-    "database": "database_production",
-    "host": "127.0.0.1",
-    "dialect": "mysql"
+    "database": "defaultdb",
+    "host": "healthconnect-mysql-healthconnect.a.aivencloud.com",
+    "port": 22255,
+    "dialect": "mysql",
+    "dialectOptions": {
+      "ssl": {
+        "require": true,
+        "rejectUnauthorized": false
+      }
+    }
   }
 }

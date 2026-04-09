@@ -33,7 +33,7 @@ jobs:
         with:
           host: ${{ secrets.AZURE_VM_IP }}
           username: ${{ secrets.AZURE_VM_USER }}
-          key: ${{ secrets.AZURE_VM_PASSWORD }}
+          password: ${{ secrets.AZURE_VM_PASSWORD }}
           script: |
             # 1. Tải image mới nhất
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/healthconnect:latest

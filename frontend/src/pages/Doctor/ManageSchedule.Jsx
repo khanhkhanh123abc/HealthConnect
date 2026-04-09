@@ -227,7 +227,7 @@ const ManageSchedule = () => {
 
                 {isLoadingSlots ? (
                     <div className="flex gap-3 flex-wrap">
-                        {[1,2,3,4,5,6,7,8].map(i => (
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                             <div key={i} className="w-36 h-10 bg-gray-100 rounded-lg animate-pulse" />
                         ))}
                     </div>

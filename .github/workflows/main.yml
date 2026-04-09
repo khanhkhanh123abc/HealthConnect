@@ -1,0 +1,51 @@
+name: Dockerize and Deploy Backend
+
+on:
+  push:
+    branches: [ "main" ] # Tự động chạy khi push vào nhánh main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/healthconnect:latest
+
+  deploy-to-azure:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Executing remote ssh commands using password
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.AZURE_VM_IP }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_PASSWORD }}
+          script: |
+            # 1. Tải image mới nhất
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/healthconnect:latest
+            
+            # 2. Xóa container cũ nếu đang chạy
+            docker rm -f backend || true
+            
+            # 3. Chạy container mới với đầy đủ cấu hình
+            docker run -d -p 8080:8080 \
+            --env-file /home/Khanh123abc/.env \
+            -e NODE_ENV=production \
+            -v /home/Khanh123abc/config.json:/app/src/config/config.json \
+            --restart always \
+            --name backend \
+            ${{ secrets.DOCKERHUB_USERNAME }}/healthconnect:latest

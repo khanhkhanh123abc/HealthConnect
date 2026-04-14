@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import axios from 'axios';
 import { createBookingService } from '../services/bookingService';
 
 const ERROR_MESSAGES = {
@@ -114,7 +113,7 @@ const BookingModal = ({ isOpen, onClose, bookingInfo }) => {
             // ===== BANK =====
             if (paymentMethod === 'BANK') {
                 try {
-                    const payRes = await axios.post('/api/create-vnpay-payment', {
+                    const payRes = await fetch ('/api/create-vnpay-payment', {
                         bookingId,
                         amount,
                         bookingToken: token,

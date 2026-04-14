@@ -113,10 +113,17 @@ const BookingModal = ({ isOpen, onClose, bookingInfo }) => {
             // ===== BANK =====
             if (paymentMethod === 'BANK') {
                 try {
-                    const payRes = await fetch ('/api/create-vnpay-payment', {
-                        bookingId,
-                        amount,
-                        bookingToken: token,
+                    const payRes = await fetch('/api/create-vnpay-payment', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Cache-Control': 'no-cache', 
+                        },
+                        body: JSON.stringify({
+                            bookingId,
+                            amount,
+                            bookingToken: token,
+                        })
                     });
 
                     const payUrl = payRes?.data?.paymentUrl;

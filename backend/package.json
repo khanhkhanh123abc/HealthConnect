@@ -7,11 +7,12 @@
   "type": "commonjs",
   "main": "src/server.js",
   "scripts": {
-  "start": "npx babel-node src/server.js",
-  "build": "echo 'no build needed'",
-  "dev": "nodemon --exec npx babel-node src/server.js"
-},
+    "start": "npx babel-node src/server.js",
+    "build": "echo 'no build needed'",
+    "dev": "nodemon --exec npx babel-node src/server.js"
+  },
   "dependencies": {
+    "axios": "^1.15.0",
     "babel": "^5.8.38",
     "bcryptjs": "^3.0.3",
     "body-parser": "^2.2.2",
@@ -24,7 +25,8 @@
     "nodemailer": "^8.0.4",
     "nodemon": "^3.1.11",
     "sequelize": "^6.37.7",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "vnpay": "^2.5.0"
   },
   "devDependencies": {
     "@babel/core": "^7.28.6",

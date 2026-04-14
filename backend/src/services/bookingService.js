@@ -2,6 +2,7 @@ import db from '../models/index';
 import { Op } from 'sequelize';
 import { v4 as uuidv4 } from 'uuid';
 import { sendBookingConfirmEmail, sendCancelEmail } from './emailService';
+import { convertUsdToVnd } from './currencyService';
 
 const DAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
@@ -67,8 +68,7 @@ let createBooking = (data) => {
                 return;
             }
 
-            // ✅ Kiểm tra có booking đã hủy (S4) không → reuse thay vì insert mới
-            // (tránh lỗi UNIQUE constraint nếu vẫn còn)
+            // Kiểm tra có booking đã hủy (S4) không → reuse thay vì insert mới
             let cancelledBooking = await BookingModel.findOne({
                 where: {
                     patientId: data.patientId,
@@ -82,35 +82,73 @@ let createBooking = (data) => {
             });
 
             const confirmToken = uuidv4();
+            let savedBookingId; // ✅ FIX 1: khai báo đúng chỗ
 
             if (cancelledBooking) {
                 // Update booking đã hủy → S1 mới
                 cancelledBooking.statusId = 'S1';
                 cancelledBooking.reason = data.reason || '';
                 cancelledBooking.token = confirmToken;
+                cancelledBooking.paymentMethod = data.paymentMethod || 'CASH';
                 await cancelledBooking.save({ transaction: t });
+                savedBookingId = cancelledBooking.id; // ✅ FIX 2: đúng tên biến
             } else {
                 // Tạo booking mới
-                await BookingModel.create({
+                const newBooking = await BookingModel.create({ // ✅ FIX 3: gán vào biến
                     statusId: 'S1',
                     doctorId: data.doctorId,
                     patientId: data.patientId,
                     date: new Date(+data.date),
                     timeType: data.timeType,
                     reason: data.reason || '',
-                    token: confirmToken
+                    token: confirmToken,
+                    paymentMethod: data.paymentMethod || 'CASH'
                 }, { transaction: t });
+                savedBookingId = newBooking.id; // ✅ FIX 4: lấy id từ biến đúng
             }
 
             schedule.currentNumber += 1;
             await schedule.save({ transaction: t });
             await t.commit();
 
-            // ===== GỬI EMAIL SAU KHI COMMIT =====
-            // Không await - không block response
+            // Lấy giá tiền từ DB và convert USD → VNĐ
+            let priceAmountVnd = 500000; // fallback
+            let priceAmountUsd = 0;
+            try {
+                let doctorInfo = await db.Doctor_Info.findOne({
+                    where: { doctorId: data.doctorId },
+                    attributes: ['priceId'],
+                    raw: true
+                });
+                if (doctorInfo?.priceId) {
+                    let priceCode = await db.allCode.findOne({
+                        where: { keyMap: doctorInfo.priceId, type: 'PRICE' },
+                        attributes: ['value'],
+                        raw: true
+                    });
+                    if (priceCode?.value) {
+                        priceAmountUsd = parseFloat(priceCode.value);
+                        priceAmountVnd = await convertUsdToVnd(priceAmountUsd);
+                    }
+                }
+            } catch (priceErr) {
+                console.error('Get price error:', priceErr.message);
+            }
+
+            // ✅ FIX 5: chỉ resolve() 1 lần duy nhất, đầy đủ thông tin
+            resolve({
+                errCode: 0,
+                errMessage: 'Đặt lịch thành công!',
+                remainingSlots: schedule.maxNumber - schedule.currentNumber,
+                token: confirmToken,
+                bookingId: savedBookingId,
+                amount: priceAmountVnd,
+                amountUsd: priceAmountUsd,
+            });
+
+            // ===== GỬI EMAIL SAU KHI COMMIT (non-blocking) =====
             (async () => {
                 try {
-                    // Lấy thông tin để gửi email
                     let patient = await db.User.findOne({
                         where: { id: data.patientId },
                         attributes: ['firstName', 'lastName', 'email'],
@@ -126,8 +164,6 @@ let createBooking = (data) => {
                         attributes: ['value'],
                         raw: true
                     });
-
-                    // Lấy địa chỉ phòng khám
                     let clinicName = '', clinicAddress = '';
                     let markdown = await db.Markdown.findOne({
                         where: { doctorId: data.doctorId },
@@ -144,35 +180,46 @@ let createBooking = (data) => {
                         clinicAddress = clinic?.address || '';
                     }
 
-                    const confirmLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/confirm-booking?token=${confirmToken}`;
                     const doctorName = doctor
                         ? `BS. ${doctor.lastName || ''} ${doctor.firstName || ''}`.trim()
                         : 'Bác sĩ';
                     const patientName = patient
                         ? `${patient.lastName || ''} ${patient.firstName || ''}`.trim()
                         : 'Bạn';
+                    const timeValue = timeTypeData?.value || data.timeType;
+                    const dateStr = formatDate(data.date);
 
-                    await sendBookingConfirmEmail({
-                        patientEmail: patient?.email,
-                        patientName,
-                        doctorName,
-                        timeValue: timeTypeData?.value || data.timeType,
-                        dateStr: formatDate(data.date),
-                        clinicName,
-                        clinicAddress,
-                        reason: data.reason || '',
-                        confirmLink
-                    });
+                    if (data.paymentMethod === 'BANK') {
+                        const { sendBankTransferPendingEmail } = require('./emailService');
+                        await sendBankTransferPendingEmail({
+                            patientEmail: patient?.email,
+                            patientName,
+                            doctorName,
+                            timeValue,
+                            dateStr,
+                            clinicName,
+                            clinicAddress,
+                            reason: data.reason || '',
+                            bookingToken: confirmToken,
+                        });
+                    } else {
+                        const confirmLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/confirm-booking?token=${confirmToken}`;
+                        await sendBookingConfirmEmail({
+                            patientEmail: patient?.email,
+                            patientName,
+                            doctorName,
+                            timeValue,
+                            dateStr,
+                            clinicName,
+                            clinicAddress,
+                            reason: data.reason || '',
+                            confirmLink,
+                        });
+                    }
                 } catch (emailErr) {
                     console.error('Email send failed (non-blocking):', emailErr.message);
                 }
             })();
-
-            resolve({
-                errCode: 0,
-                errMessage: 'Đặt lịch thành công! Email xác nhận đã được gửi.',
-                remainingSlots: schedule.maxNumber - schedule.currentNumber
-            });
 
         } catch (e) {
             await t.rollback();
@@ -184,7 +231,7 @@ let createBooking = (data) => {
             }
         }
     });
-}
+};
 
 // Xác nhận lịch qua link trong email
 let confirmBookingByToken = (token) => {
@@ -214,7 +261,7 @@ let confirmBookingByToken = (token) => {
                 return;
             }
 
-            booking.statusId = 'S2'; // Confirmed
+            booking.statusId = 'S2';
             await booking.save();
 
             resolve({ errCode: 0, errMessage: 'Xác nhận lịch khám thành công!' });
@@ -223,7 +270,7 @@ let confirmBookingByToken = (token) => {
             reject(e);
         }
     });
-}
+};
 
 let getBookingsByPatient = (patientId) => {
     return new Promise(async (resolve, reject) => {
@@ -285,7 +332,7 @@ let getBookingsByPatient = (patientId) => {
             reject(e);
         }
     });
-}
+};
 
 let cancelBooking = (bookingId, patientId) => {
     return new Promise(async (resolve, reject) => {
@@ -371,7 +418,7 @@ let cancelBooking = (bookingId, patientId) => {
             reject(e);
         }
     });
-}
+};
 
 let getScheduleWithSlots = (doctorId, date) => {
     return new Promise(async (resolve, reject) => {
@@ -405,7 +452,7 @@ let getScheduleWithSlots = (doctorId, date) => {
             reject(e);
         }
     });
-}
+};
 
 let getBookingsByDoctor = (doctorId, weekStart) => {
     return new Promise(async (resolve, reject) => {
@@ -546,13 +593,131 @@ let sendMedicalRecord = (bookingId, doctorId, content) => {
         }
     });
 };
+
+let confirmPayment = (bookingId) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            if (!bookingId) {
+                resolve({ errCode: 1, errMessage: 'Missing bookingId!' });
+                return;
+            }
+            const BookingModel = db.Booking || db.Bookings;
+            let booking = await BookingModel.findOne({
+                where: { id: bookingId },
+                raw: false
+            });
+            if (!booking) {
+                resolve({ errCode: 2, errMessage: 'Không tìm thấy lịch hẹn!' });
+                return;
+            }
+            if (booking.paymentMethod !== 'BANK') {
+                resolve({ errCode: 3, errMessage: 'Lịch này không phải thanh toán chuyển khoản!' });
+                return;
+            }
+            if (booking.statusId === 'S2') {
+                resolve({ errCode: 0, errMessage: 'Lịch đã được xác nhận trước đó!', alreadyConfirmed: true });
+                return;
+            }
+            if (booking.statusId === 'S4') {
+                resolve({ errCode: 4, errMessage: 'Lịch đã bị hủy, không thể xác nhận!' });
+                return;
+            }
+
+            booking.statusId = 'S2';
+            await booking.save();
+
+            (async () => {
+                try {
+                    let patient = await db.User.findOne({
+                        where: { id: booking.patientId },
+                        attributes: ['firstName', 'lastName', 'email'],
+                        raw: true
+                    });
+                    let doctor = await db.User.findOne({
+                        where: { id: booking.doctorId },
+                        attributes: ['firstName', 'lastName'],
+                        raw: true
+                    });
+                    let timeTypeData = await db.allCode.findOne({
+                        where: { keyMap: booking.timeType, type: 'TIME' },
+                        attributes: ['value'],
+                        raw: true
+                    });
+                    const { sendBankTransferConfirmedEmail } = require('./emailService');
+                    await sendBankTransferConfirmedEmail({
+                        patientEmail: patient?.email,
+                        patientName: `${patient?.lastName || ''} ${patient?.firstName || ''}`.trim(),
+                        doctorName: `BS. ${doctor?.lastName || ''} ${doctor?.firstName || ''}`.trim(),
+                        timeValue: timeTypeData?.value || booking.timeType,
+                        dateStr: formatDate(booking.date),
+                    });
+                } catch (e) {
+                    console.error('Email confirm payment failed:', e.message);
+                }
+            })();
+
+            resolve({ errCode: 0, errMessage: 'Xác nhận thanh toán thành công! Lịch đã được chốt.' });
+        } catch (e) {
+            reject(e);
+        }
+    });
+};
+
+let getPendingBankBookings = () => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const BookingModel = db.Booking || db.Bookings;
+            let bookings = await BookingModel.findAll({
+                where: {
+                    paymentMethod: 'BANK',
+                    statusId: 'S1'
+                },
+                order: [['createdAt', 'ASC']],
+                raw: true
+            });
+
+            let result = await Promise.all(bookings.map(async (booking) => {
+                let patient = await db.User.findOne({
+                    where: { id: booking.patientId },
+                    attributes: ['firstName', 'lastName', 'email', 'phoneNumber'],
+                    raw: true
+                });
+                let doctor = await db.User.findOne({
+                    where: { id: booking.doctorId },
+                    attributes: ['firstName', 'lastName'],
+                    raw: true
+                });
+                let timeTypeData = await db.allCode.findOne({
+                    where: { keyMap: booking.timeType, type: 'TIME' },
+                    attributes: ['value'],
+                    raw: true
+                });
+                return {
+                    ...booking,
+                    timeValue: timeTypeData?.value || booking.timeType,
+                    patientName: patient ? `${patient.lastName || ''} ${patient.firstName || ''}`.trim() : 'Bệnh nhân',
+                    patientEmail: patient?.email || '',
+                    patientPhone: patient?.phoneNumber || '',
+                    doctorName: doctor ? `BS. ${doctor.lastName || ''} ${doctor.firstName || ''}`.trim() : 'Bác sĩ',
+                };
+            }));
+
+            resolve({ errCode: 0, data: result });
+        } catch (e) {
+            reject(e);
+        }
+    });
+};
+
 module.exports = {
     createBooking,
     confirmBookingByToken,
     getBookingsByPatient,
     cancelBooking,
+    getPendingBankBookings,
     getScheduleWithSlots,
+    confirmPayment,
     getBookingsByDoctor,
     completeBooking,
     sendMedicalRecord
-}
+};

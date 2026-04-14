@@ -314,5 +314,95 @@ ${data.content}
     return false;
   }
 };
+// ===== EMAIL THÔNG BÁO CHỜ CHUYỂN KHOẢN =====
+let sendBankTransferPendingEmail = async (data) => {
+  try {
+    const html = `
+<!DOCTYPE html><html lang="vi">
+<body style="font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:40px 20px;">
+  <table width="600" cellpadding="0" cellspacing="0"
+    style="background:#fff;border-radius:16px;overflow:hidden;margin:0 auto;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <tr><td style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:30px 40px;text-align:center;">
+      <h1 style="margin:0;color:#fff;font-size:22px;">HealthConnect</h1>
+      <p style="margin:6px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">Chờ xác nhận thanh toán</p>
+    </td></tr>
+    <tr><td style="padding:30px 40px;">
+      <p style="color:#374151;font-size:15px;margin:0 0 12px;">Xin chào <strong>${data.patientName}</strong>,</p>
+      <p style="color:#6b7280;font-size:14px;margin:0 0 20px;line-height:1.7;">
+        Chúng tôi đã nhận được yêu cầu đặt lịch của bạn với <strong>${data.doctorName}</strong>
+        vào lúc <strong>${data.timeValue}</strong>, ngày <strong>${data.dateStr}</strong>.
+      </p>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:20px 24px;margin-bottom:20px;">
+        <p style="margin:0 0 10px;color:#92400e;font-size:14px;font-weight:600;">Thông tin chuyển khoản</p>
+        <p style="margin:4px 0;color:#78350f;font-size:14px;">Ngân hàng: <strong>MB Bank</strong></p>
+        <p style="margin:4px 0;color:#78350f;font-size:14px;">Số tài khoản: <strong>0123456789</strong></p>
+        <p style="margin:4px 0;color:#78350f;font-size:14px;">Tên tài khoản: <strong>PHONG KHAM HEALTHCONNECT</strong></p>
+        <p style="margin:4px 0;color:#78350f;font-size:14px;">Số tiền: <strong style="color:#dc2626;">500.000 VNĐ</strong></p>
+        <p style="margin:10px 0 0;color:#92400e;font-size:13px;font-weight:600;">
+          Nội dung CK bắt buộc: <span style="background:#fef3c7;padding:2px 8px;border-radius:4px;">TTKHAM ${data.bookingToken?.slice(-8)?.toUpperCase()}</span>
+        </p>
+      </div>
+      <p style="color:#ef4444;font-size:13px;margin:0;">
+        ⚠ Vui lòng chuyển khoản trong vòng <strong>2 giờ</strong> để giữ lịch. Sau thời gian này lịch sẽ tự động hủy.
+      </p>
+    </td></tr>
+    <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 40px;text-align:center;">
+      <p style="margin:0;color:#9ca3af;font-size:12px;">Email tự động từ HealthConnect. Vui lòng không trả lời.</p>
+    </td></tr>
+  </table>
+</body></html>`;
+    await transporter.sendMail({
+      from: `"HealthConnect" <${process.env.EMAIL_APP}>`,
+      to: data.patientEmail,
+      subject: `[HealthConnect] Vui lòng chuyển khoản để xác nhận lịch khám - ${data.dateStr}`,
+      html
+    });
+    return true;
+  } catch (e) {
+    console.error('Send bank pending email error:', e.message);
+    return false;
+  }
+};
 
-module.exports = { sendBookingConfirmEmail, sendCancelEmail, sendMedicalRecordEmail };
+// ===== EMAIL XÁC NHẬN ĐÃ NHẬN TIỀN =====
+let sendBankTransferConfirmedEmail = async (data) => {
+  try {
+    const html = `
+<!DOCTYPE html><html lang="vi">
+<body style="font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:40px 20px;">
+  <table width="600" cellpadding="0" cellspacing="0"
+    style="background:#fff;border-radius:16px;overflow:hidden;margin:0 auto;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <tr><td style="background:linear-gradient(135deg,#10b981,#059669);padding:30px 40px;text-align:center;">
+      <h1 style="margin:0;color:#fff;font-size:22px;">HealthConnect</h1>
+      <p style="margin:6px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">Thanh toán thành công ✓</p>
+    </td></tr>
+    <tr><td style="padding:30px 40px;">
+      <p style="color:#374151;font-size:15px;margin:0 0 12px;">Xin chào <strong>${data.patientName}</strong>,</p>
+      <p style="color:#6b7280;font-size:14px;margin:0 0 20px;line-height:1.7;">
+        Chúng tôi đã nhận được thanh toán của bạn. Lịch khám với <strong>${data.doctorName}</strong>
+        vào lúc <strong>${data.timeValue}</strong>, ngày <strong>${data.dateStr}</strong>
+        đã được <strong style="color:#059669;">xác nhận chính thức</strong>.
+      </p>
+      <div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;padding:16px 24px;text-align:center;">
+        <p style="margin:0;color:#065f46;font-size:15px;font-weight:600;">Lịch khám của bạn đã được chốt!</p>
+        <p style="margin:8px 0 0;color:#047857;font-size:13px;">Vui lòng đến đúng giờ. Mang theo CMND/CCCD khi đến khám.</p>
+      </div>
+    </td></tr>
+    <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 40px;text-align:center;">
+      <p style="margin:0;color:#9ca3af;font-size:12px;">Email tự động từ HealthConnect. Vui lòng không trả lời.</p>
+    </td></tr>
+  </table>
+</body></html>`;
+    await transporter.sendMail({
+      from: `"HealthConnect" <${process.env.EMAIL_APP}>`,
+      to: data.patientEmail,
+      subject: `[HealthConnect] Thanh toán thành công - Lịch khám đã được chốt`,
+      html
+    });
+    return true;
+  } catch (e) {
+    console.error('Send bank confirmed email error:', e.message);
+    return false;
+  }
+};
+module.exports = { sendBookingConfirmEmail, sendCancelEmail, sendMedicalRecordEmail, sendBankTransferPendingEmail, sendBankTransferConfirmedEmail };

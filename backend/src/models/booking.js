@@ -36,8 +36,9 @@ module.exports = (sequelize, DataTypes) => {
         patientId: DataTypes.INTEGER,
         date: DataTypes.DATE,
         timeType: DataTypes.STRING,
-        reason: DataTypes.TEXT,        
+        reason: DataTypes.TEXT,
         token: DataTypes.STRING,
+        paymentMethod: DataTypes.STRING,
     }, {
         sequelize,
         modelName: 'Bookings',

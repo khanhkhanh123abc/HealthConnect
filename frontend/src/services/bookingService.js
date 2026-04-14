@@ -12,10 +12,18 @@ const getBookingsByPatientService = (patientId) => {
 const cancelBookingService = (bookingId, patientId) => {
     return axios.put('/api/cancel-booking', { bookingId, patientId });
 };
+const getPendingBankBookingsService = () => {
+    return axios.get('/api/get-pending-bank-bookings');
+};
 
+// Admin xác nhận đã nhận tiền
+const confirmPaymentService = (bookingId) => {
+    return axios.put('/api/confirm-payment', { bookingId });
+};
 export {
     createBookingService,
     getBookingsByPatientService,
-    cancelBookingService
-
+    cancelBookingService,
+    getPendingBankBookingsService,
+    confirmPaymentService
 };

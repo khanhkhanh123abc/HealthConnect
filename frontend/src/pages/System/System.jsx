@@ -4,6 +4,7 @@ import UserManage from './User/UserManage';
 import ManageSpecialty from './Specialty/ManageSpecialty';
 import ManageClinic from './Clinic/ManageClinic';
 import ManageDoctor from './Doctor/ManageDoctor';
+import ManageBookingPayment from './Booking/ManageBookingPayment';
 
 const System = () => {
     return (
@@ -18,6 +19,7 @@ const System = () => {
                 <Route path="/specialty-manage" element={<ManageSpecialty />} />
                 <Route path="/clinic-manage" element={<ManageClinic />} />
                 <Route path="/doctor-manage" element={<ManageDoctor />} />
+                <Route path="/payment-manage" element={<ManageBookingPayment />} />
             </Routes>
         </div>
     );

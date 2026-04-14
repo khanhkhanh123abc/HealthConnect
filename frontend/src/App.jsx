@@ -13,6 +13,7 @@ import DoctorDetail from './pages/System/Doctor/DoctorDetail';
 import MyBookings from './pages/MyBookings';
 import ConfirmBooking from './pages/ConfirmBooking';
 import BookingPage from './pages/BookingPage';
+import PaymentResult from './pages/PaymentResult';
 
 function App() {
   const { isLoggedIn, userInfo } = useSelector((state) => state.user);
@@ -29,14 +30,14 @@ function App() {
               {/* Trang chi tiết bác sĩ */}
               <Route path="/doctor-profile/:id" element={
                 <DefaultLayout><DoctorDetail /></DefaultLayout>
-              }/>
+              } />
 
               {/* Lịch hẹn của bệnh nhân */}
               <Route path="/my-bookings" element={
                 isLoggedIn
                   ? <DefaultLayout><MyBookings /></DefaultLayout>
                   : <Navigate to="/login" />
-              }/>
+              } />
 
               {/* Xác nhận lịch qua email - PUBLIC, không cần đăng nhập */}
               <Route path="/confirm-booking" element={<ConfirmBooking />} />
@@ -44,30 +45,30 @@ function App() {
               {/* Trang đặt lịch 4 bước - PUBLIC */}
               <Route path="/booking" element={
                 <DefaultLayout><BookingPage /></DefaultLayout>
-              }/>
+              } />
 
               <Route path="/login" element={
                 !isLoggedIn ? <Login /> : (
                   <Navigate to={
                     userInfo?.roleId === 'R1' ? '/system'
-                    : userInfo?.roleId === 'R2' ? '/doctor'
-                    : '/home'
-                  }/>
+                      : userInfo?.roleId === 'R2' ? '/doctor'
+                        : '/home'
+                  } />
                 )
-              }/>
+              } />
 
               <Route path="/system/*" element={
                 isLoggedIn && userInfo?.roleId === 'R1'
                   ? <DefaultLayout><System /></DefaultLayout>
                   : <Navigate to="/login" />
-              }/>
+              } />
 
               <Route path="/doctor/*" element={
                 isLoggedIn && userInfo?.roleId === 'R2'
                   ? <DefaultLayout><Doctor /></DefaultLayout>
                   : <Navigate to="/login" />
-              }/>
-
+              } />
+              <Route path="/payment-result" element={<PaymentResult />} />
               <Route path="/" element={<Navigate to="/home" />} />
               <Route path="*" element={<Navigate to="/home" />} />
 

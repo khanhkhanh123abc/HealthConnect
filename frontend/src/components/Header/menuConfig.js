@@ -3,6 +3,7 @@ export const adminMenu = [
     { name: 'Doctor Management', link: '/system/doctor-manage' },
     { name: 'Clinic Management', link: '/system/clinic-manage' },
     { name: 'Specialty Management', link: '/system/specialty-manage' },
+    { name: 'Confirm payment', link: '/system/payment-manage' },
 ];
 
 export const doctorMenu = [

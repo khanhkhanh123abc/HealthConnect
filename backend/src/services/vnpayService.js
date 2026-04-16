@@ -1,4 +1,5 @@
 import { VNPay, VnpLocale, dateFormat } from 'vnpay';
+import moment from 'moment-timezone';
 
 const vnpay = new VNPay({
     tmnCode: process.env.VNPAY_TMN_CODE,
@@ -7,139 +8,159 @@ const vnpay = new VNPay({
     testMode: true,
 });
 
-// ── Tạo URL redirect sang trang thanh toán VNPay ──
-let createPaymentUrl = (bookingId, amount, ipAddr, bookingToken) => {
-    return new Promise((resolve, reject) => {
-        try {
-            const txnRef = `HC${bookingId}${Date.now()}`;  // Mã giao dịch duy nhất
+// ===== Helper: lấy giờ VN (GMT+7) =====
+const getVNTime = () => moment().tz('Asia/Ho_Chi_Minh');
 
-            const paymentUrl = vnpay.buildPaymentUrl({
-                vnp_Amount: amount,                          // VND, không nhân 100 (thư viện tự xử lý)
-                vnp_IpAddr: ipAddr,
-                vnp_TxnRef: txnRef,
-                vnp_OrderInfo: `Thanh toan lich kham #${bookingId}`,
-                vnp_OrderType: 'other',
-                vnp_ReturnUrl: process.env.VNPAY_RETURN_URL,
-                vnp_Locale: VnpLocale.VN,
-                vnp_CreateDate: dateFormat(new Date()),
-                vnp_ExpireDate: dateFormat(new Date(Date.now() + 15 * 60 * 1000)), // hết hạn 15 phút
-            });
+// ===== 1. Tạo URL thanh toán =====
+const createPaymentUrl = async (bookingId, amount, ipAddr) => {
+    try {
+        const txnRef = `HC${bookingId}${Date.now()}`;
 
-            resolve({ errCode: 0, paymentUrl, txnRef });
-        } catch (e) {
-            reject(e);
-        }
-    });
+        const createDate = getVNTime();
+        const expireDate = getVNTime().add(15, 'minutes');
+
+        const paymentUrl = vnpay.buildPaymentUrl({
+            vnp_Amount: amount, // thư viện tự nhân 100
+            vnp_IpAddr: ipAddr,
+            vnp_TxnRef: txnRef,
+            vnp_OrderInfo: `Thanh toan lich kham #${bookingId}`,
+            vnp_OrderType: 'other',
+            vnp_ReturnUrl: process.env.VNPAY_RETURN_URL,
+            vnp_Locale: VnpLocale.VN,
+            vnp_CreateDate: dateFormat(createDate.toDate()),
+            vnp_ExpireDate: dateFormat(expireDate.toDate()),
+        });
+
+        return { errCode: 0, paymentUrl, txnRef };
+    } catch (e) {
+        console.error('createPaymentUrl error:', e);
+        throw e;
+    }
 };
 
-// ── Xử lý IPN — VNPay gọi về để xác nhận tiền ──
-let handleVNPayIPN = (vnpParams) => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            const db = require('../models/index').default || require('../models/index');
-            const { sendBankTransferConfirmedEmail } = require('./emailService');
+// ===== 2. Xử lý IPN =====
+const handleVNPayIPN = async (vnpParams) => {
+    try {
+        const db = require('../models/index').default || require('../models/index');
+        const { sendBankTransferConfirmedEmail } = require('./emailService');
 
-            // 1. Verify chữ ký từ VNPay
-            const verify = vnpay.verifyIpnCall(vnpParams);
+        // 1. Verify chữ ký
+        const verify = vnpay.verifyIpnCall(vnpParams);
 
-            if (!verify.isVerified) {
-                resolve({ RspCode: '97', Message: 'Invalid checksum' });
-                return;
-            }
-            if (!verify.isSuccess) {
-                resolve({ RspCode: '00', Message: 'Transaction failed - no action' });
-                return;
-            }
-
-            // 2. Lấy bookingId từ txnRef (format: HC{bookingId}{timestamp})
-            const txnRef = vnpParams['vnp_TxnRef'];
-            // txnRef = "HC12171234567890" → bỏ "HC" lấy số cho đến khi gặp timestamp
-            const bookingIdMatch = txnRef.match(/^HC(\d+)\d{13}$/);
-            if (!bookingIdMatch) {
-                resolve({ RspCode: '01', Message: 'Order not found' });
-                return;
-            }
-            const bookingId = parseInt(bookingIdMatch[1]);
-
-            // 3. Tìm booking trong DB
-            const BookingModel = db.Booking || db.Bookings;
-            let booking = await BookingModel.findOne({
-                where: { id: bookingId },
-                raw: false
-            });
-
-            if (!booking) {
-                resolve({ RspCode: '01', Message: 'Order not found' });
-                return;
-            }
-            if (booking.statusId === 'S2') {
-                // Đã xác nhận trước đó → trả 00 để VNPay không retry
-                resolve({ RspCode: '00', Message: 'Already confirmed' });
-                return;
-            }
-
-            // 4. Cập nhật S1 → S2
-            booking.statusId = 'S2';
-            await booking.save();
-
-            // 5. Gửi email xác nhận (non-blocking)
-            (async () => {
-                try {
-                    const patient = await db.User.findOne({
-                        where: { id: booking.patientId },
-                        attributes: ['firstName', 'lastName', 'email'],
-                        raw: true
-                    });
-                    const doctor = await db.User.findOne({
-                        where: { id: booking.doctorId },
-                        attributes: ['firstName', 'lastName'],
-                        raw: true
-                    });
-                    const timeTypeData = await db.allCode.findOne({
-                        where: { keyMap: booking.timeType, type: 'TIME' },
-                        attributes: ['value'],
-                        raw: true
-                    });
-                    const DAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-                    const d = new Date(booking.date);
-                    const dateStr = `${DAY_LABELS[d.getDay()]}, ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
-
-                    await sendBankTransferConfirmedEmail({
-                        patientEmail: patient?.email,
-                        patientName: `${patient?.lastName || ''} ${patient?.firstName || ''}`.trim(),
-                        doctorName: `BS. ${doctor?.lastName || ''} ${doctor?.firstName || ''}`.trim(),
-                        timeValue: timeTypeData?.value || booking.timeType,
-                        dateStr,
-                    });
-                } catch (e) {
-                    console.error('IPN email error:', e.message);
-                }
-            })();
-
-            // 6. Trả về 00 cho VNPay — bắt buộc, không trả thì VNPay retry liên tục
-            resolve({ RspCode: '00', Message: 'Confirm success' });
-
-        } catch (e) {
-            console.error('handleVNPayIPN error:', e);
-            reject(e);
+        if (!verify.isVerified) {
+            return { RspCode: '97', Message: 'Invalid checksum' };
         }
-    });
+
+        if (!verify.isSuccess) {
+            return { RspCode: '00', Message: 'Transaction failed' };
+        }
+
+        // 2. Parse bookingId
+        const txnRef = vnpParams['vnp_TxnRef'];
+        const match = txnRef.match(/^HC(\d+)\d{13}$/);
+
+        if (!match) {
+            return { RspCode: '01', Message: 'Order not found' };
+        }
+
+        const bookingId = parseInt(match[1]);
+
+        // 3. Tìm booking
+        const BookingModel = db.Booking || db.Bookings;
+
+        const booking = await BookingModel.findOne({
+            where: { id: bookingId }
+        });
+
+        if (!booking) {
+            return { RspCode: '01', Message: 'Order not found' };
+        }
+
+        // 4. Nếu đã confirm thì bỏ qua (tránh duplicate)
+        if (booking.statusId === 'S2') {
+            return { RspCode: '00', Message: 'Already confirmed' };
+        }
+
+        // 5. Update trạng thái
+        booking.statusId = 'S2';
+        await booking.save();
+
+        // 6. Gửi email (non-blocking)
+        (async () => {
+            try {
+                const patient = await db.User.findOne({
+                    where: { id: booking.patientId },
+                    attributes: ['firstName', 'lastName', 'email'],
+                    raw: true
+                });
+
+                const doctor = await db.User.findOne({
+                    where: { id: booking.doctorId },
+                    attributes: ['firstName', 'lastName'],
+                    raw: true
+                });
+
+                const timeTypeData = await db.allCode.findOne({
+                    where: { keyMap: booking.timeType, type: 'TIME' },
+                    attributes: ['value'],
+                    raw: true
+                });
+
+                const DAY_LABELS = [
+                    'Chủ nhật', 'Thứ 2', 'Thứ 3',
+                    'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'
+                ];
+
+                const d = moment(booking.date).tz('Asia/Ho_Chi_Minh');
+
+                const dateStr = `${DAY_LABELS[d.day()]}, ${d.date()}/${d.month() + 1}/${d.year()}`;
+
+                await sendBankTransferConfirmedEmail({
+                    patientEmail: patient?.email,
+                    patientName: `${patient?.lastName || ''} ${patient?.firstName || ''}`.trim(),
+                    doctorName: `BS. ${doctor?.lastName || ''} ${doctor?.firstName || ''}`.trim(),
+                    timeValue: timeTypeData?.value || booking.timeType,
+                    dateStr,
+                });
+
+            } catch (e) {
+                console.error('IPN email error:', e.message);
+            }
+        })();
+
+        // 7. Trả về cho VNPay
+        return { RspCode: '00', Message: 'Confirm success' };
+
+    } catch (e) {
+        console.error('handleVNPayIPN error:', e);
+        return { RspCode: '99', Message: 'Unknown error' };
+    }
 };
 
-// ── Xử lý Return URL — hiển thị kết quả cho bệnh nhân ──
-let handleVNPayReturn = (vnpParams) => {
-    return new Promise((resolve, reject) => {
-        try {
-            const verify = vnpay.verifyReturnUrl(vnpParams);
-            if (verify.isVerified && verify.isSuccess) {
-                resolve({ errCode: 0, message: 'Thanh toán thành công!' });
-            } else {
-                resolve({ errCode: 1, message: 'Thanh toán thất bại hoặc bị huỷ!' });
-            }
-        } catch (e) {
-            reject(e);
+// ===== 3. Xử lý Return URL =====
+const handleVNPayReturn = async (vnpParams) => {
+    try {
+        const verify = vnpay.verifyReturnUrl(vnpParams);
+
+        if (verify.isVerified && verify.isSuccess) {
+            return {
+                errCode: 0,
+                message: 'Thanh toán thành công!'
+            };
+        } else {
+            return {
+                errCode: 1,
+                message: 'Thanh toán thất bại hoặc bị huỷ!'
+            };
         }
-    });
+    } catch (e) {
+        console.error('handleVNPayReturn error:', e);
+        throw e;
+    }
 };
 
-module.exports = { createPaymentUrl, handleVNPayIPN, handleVNPayReturn };
+module.exports = {
+    createPaymentUrl,
+    handleVNPayIPN,
+    handleVNPayReturn
+};

@@ -1,4 +1,4 @@
-import { VNPay, ProductCode, VnpLocale, dateFormat } from 'vnpay';
+import { VNPay, VnpLocale, dateFormat } from 'vnpay';
 
 const vnpay = new VNPay({
     tmnCode: process.env.VNPAY_TMN_CODE,
@@ -18,7 +18,7 @@ let createPaymentUrl = (bookingId, amount, ipAddr, bookingToken) => {
                 vnp_IpAddr: ipAddr,
                 vnp_TxnRef: txnRef,
                 vnp_OrderInfo: `Thanh toan lich kham #${bookingId}`,
-                vnp_OrderType: ProductCode.Health,
+                vnp_OrderType: 'other',
                 vnp_ReturnUrl: process.env.VNPAY_RETURN_URL,
                 vnp_Locale: VnpLocale.VN,
                 vnp_CreateDate: dateFormat(new Date()),

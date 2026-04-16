@@ -2,11 +2,12 @@ name: Dockerize and Deploy Backend
 
 on:
   push:
-    branches: [ "main" ] # Tự động chạy khi push vào nhánh main
+    branches: ["main"]
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -17,35 +18,50 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # 🔥 Build & push image (không cache để tránh lỗi timezone cũ)
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./backend
           push: true
+          no-cache: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/healthconnect:latest
 
   deploy-to-azure:
     needs: build-and-push
     runs-on: ubuntu-latest
+
     steps:
-      - name: Executing remote ssh commands using password
+      - name: Deploy to Azure VM via SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.AZURE_VM_IP }}
           username: ${{ secrets.AZURE_VM_USER }}
           password: ${{ secrets.AZURE_VM_PASSWORD }}
           script: |
-            # 1. Tải image mới nhất
+            echo "🚀 Pull image mới"
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/healthconnect:latest
-            
-            # 2. Xóa container cũ nếu đang chạy
+
+            echo "🧹 Xóa container cũ"
             docker rm -f backend || true
-            
-            # 3. Chạy container mới với đầy đủ cấu hình
+
+            echo "▶️ Run container mới (FIX TIMEZONE)"
             docker run -d -p 8080:8080 \
-            --env-file /home/Khanh123abc/.env \
-            -e NODE_ENV=production \
-            -v /home/Khanh123abc/config.json:/app/src/config/config.json \
-            --restart always \
-            --name backend \
-            ${{ secrets.DOCKERHUB_USERNAME }}/healthconnect:latest
+              --env-file /home/Khanh123abc/.env \
+              -e NODE_ENV=production \
+              -e TZ=Asia/Ho_Chi_Minh \
+              -v /etc/localtime:/etc/localtime:ro \
+              -v /etc/timezone:/etc/timezone:ro \
+              -v /home/Khanh123abc/config.json:/app/src/config/config.json \
+              --restart always \
+              --name backend \
+              ${{ secrets.DOCKERHUB_USERNAME }}/healthconnect:latest
+
+            echo "⏳ Đợi container khởi động..."
+            sleep 5
+
+            echo "🕒 Check timezone trong container"
+            docker exec backend date
+
+            echo "🧪 Check Node timezone"
+            docker exec backend node -e "console.log(new Date())"

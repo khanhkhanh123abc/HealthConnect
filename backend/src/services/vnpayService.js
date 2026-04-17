@@ -157,15 +157,60 @@ const handleVNPayReturn = async (vnpParams) => {
         const verify = vnpay.verifyReturnUrl(vnpParams);
 
         if (verify.isVerified && verify.isSuccess) {
-            return {
-                errCode: 0,
-                message: 'Thanh toán thành công!'
-            };
+            // ✅ Tự động confirm booking từ Return URL
+            const txnRef = vnpParams['vnp_TxnRef'];
+            const match = txnRef?.match(/^HC(\d+)\d{13}$/);
+
+            if (match) {
+                const bookingId = parseInt(match[1]);
+                const db = require('../models/index').default || require('../models/index');
+                const { sendBankTransferConfirmedEmail } = require('./emailService');
+                const BookingModel = db.Booking || db.Bookings;
+
+                const booking = await BookingModel.findOne({
+                    where: { id: bookingId }, raw: false
+                });
+
+                if (booking && booking.statusId === 'S1') {
+                    booking.statusId = 'S2';
+                    await booking.save();
+                    console.log(`[VNPay Return] Booking #${bookingId} confirmed S2`);
+
+                    // Gửi email xác nhận (non-blocking)
+                    (async () => {
+                        try {
+                            const patient = await db.User.findOne({
+                                where: { id: booking.patientId },
+                                attributes: ['firstName', 'lastName', 'email'], raw: true
+                            });
+                            const doctor = await db.User.findOne({
+                                where: { id: booking.doctorId },
+                                attributes: ['firstName', 'lastName'], raw: true
+                            });
+                            const timeTypeData = await db.allCode.findOne({
+                                where: { keyMap: booking.timeType, type: 'TIME' },
+                                attributes: ['value'], raw: true
+                            });
+                            const DAY_LABELS = ['Chủ nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
+                            const d = new Date(booking.date);
+                            const dateStr = `${DAY_LABELS[d.getDay()]}, ${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+                            await sendBankTransferConfirmedEmail({
+                                patientEmail: patient?.email,
+                                patientName: `${patient?.lastName||''} ${patient?.firstName||''}`.trim(),
+                                doctorName: `BS. ${doctor?.lastName||''} ${doctor?.firstName||''}`.trim(),
+                                timeValue: timeTypeData?.value || booking.timeType,
+                                dateStr,
+                            });
+                        } catch (e) {
+                            console.error('Return URL email error:', e.message);
+                        }
+                    })();
+                }
+            }
+
+            return { errCode: 0, message: 'Thanh toán thành công!' };
         } else {
-            return {
-                errCode: 1,
-                message: 'Thanh toán thất bại hoặc bị huỷ!'
-            };
+            return { errCode: 1, message: 'Thanh toán thất bại hoặc bị huỷ!' };
         }
     } catch (e) {
         console.error('handleVNPayReturn error:', e);

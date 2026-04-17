@@ -4,10 +4,12 @@ import { useSelector } from 'react-redux';
 import HomeHeader from '../components/Header/Header';
 import { getTopDoctorHomeService } from '../services/doctorService';
 import axios from '../utils/axios';
+import { useLocation } from 'react-router-dom';
 
 const Home = () => {
     const navigate = useNavigate();
     const isLoggedIn = useSelector(state => state.user.isLoggedIn);
+    const location = useLocation();
 
     const [topDoctors, setTopDoctors] = useState([]);
     const [specialties, setSpecialties] = useState([]);
@@ -15,27 +17,28 @@ const Home = () => {
     const [isLoadingSpecialties, setIsLoadingSpecialties] = useState(true);
 
     useEffect(() => {
-        // Load top doctors
-        const fetchDoctors = async () => {
-            try {
-                let res = await getTopDoctorHomeService(8);
-                if (res?.data?.errCode === 0) setTopDoctors(res.data.data || []);
-            } catch (_e) {}
-            finally { setIsLoadingDoctors(false); }
-        };
+    if (location.pathname !== '/home') return;
 
-        // Load specialties
-        const fetchSpecialties = async () => {
-            try {
-                let res = await axios.get('/api/get-all-specialty');
-                if (res?.data?.errCode === 0) setSpecialties((res.data.data || []).slice(0, 8));
-            } catch (_e) {}
-            finally { setIsLoadingSpecialties(false); }
-        };
+    const fetchDoctors = async () => {
+        try {
+            let res = await getTopDoctorHomeService(8);
+            if (res?.data?.errCode === 0) setTopDoctors(res.data.data || []);
+        } catch {}
+        finally { setIsLoadingDoctors(false); }
+    };
 
-        fetchDoctors();
-        fetchSpecialties();
-    }, []);
+    const fetchSpecialties = async () => {
+        try {
+            let res = await axios.get('/api/get-all-specialty');
+            if (res?.data?.errCode === 0) setSpecialties((res.data.data || []).slice(0, 8));
+        } catch {}
+        finally { setIsLoadingSpecialties(false); }
+    };
+
+    fetchDoctors();
+    fetchSpecialties();
+
+}, [location.pathname]);
 
     const goToBooking = (specialtyId) => {
         // Navigate to booking page - specialty pre-selection handled via state if needed

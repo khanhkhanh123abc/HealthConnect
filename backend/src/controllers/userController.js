@@ -31,6 +31,19 @@ let handleCreateNewUser = async (req, res) => {
     }
 };
 
+let handleRegister = async (req, res) => {
+    try {
+        let info = await userService.registerUser(req.body);
+        return res.status(200).json(info);
+    } catch (e) {
+        console.log(e);
+        return res.status(200).json({
+            errCode: -1,
+            errMessage: 'Lỗi từ phía máy chủ...'
+        });
+    }
+}
+
 let handleEditUser = async (req, res) => {
     try {
         let message = await userService.updateUserData(req.body);
@@ -71,4 +84,5 @@ module.exports = {
     handleEditUser,
     handleDeleteUser,
     getAllCode,
+    handleRegister,
 };

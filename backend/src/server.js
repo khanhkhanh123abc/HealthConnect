@@ -1,3 +1,4 @@
+process.env.TZ = 'Asia/Ho_Chi_Minh';
 import express from 'express';
 import bodyParser from 'body-parser';
 import configViewEngine from './config/viewEngine.js';

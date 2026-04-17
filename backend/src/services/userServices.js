@@ -53,6 +53,44 @@ let handleUserLogin = (email, password) => {
         }
     });
 }
+// backend/src/services/userServices.js
+
+let registerUser = (data) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            // 1. Kiểm tra email đã tồn tại chưa
+            let check = await checkUserEmail(data.email);
+            if (check === true) {
+                resolve({
+                    errCode: 1,
+                    errMessage: 'Email này đã được sử dụng. Vui lòng thử email khác!'
+                });
+            } else {
+                // 2. Hash mật khẩu để bảo mật
+                let hashPasswordFromLib = await hashUserPassword(data.password);
+                
+                // 3. Tạo người dùng mới với roleId mặc định là R3 (Patient)
+                await db.User.create({
+                    email: data.email,
+                    password: hashPasswordFromLib,
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    address: data.address,
+                    phonenumber: data.phonenumber,
+                    gender: data.gender,
+                    roleId: 'R3', // Mặc định là Patient
+                });
+
+                resolve({
+                    errCode: 0,
+                    message: 'Đăng ký tài khoản thành công!'
+                });
+            }
+        } catch (e) {
+            reject(e);
+        }
+    });
+};
 
 let checkUserEmail = (email) => {
     return new Promise(async (resolve, reject) => {
@@ -180,4 +218,6 @@ module.exports = {
     updateUserData,
     deleteUser,
     getAllCodeService,
+    registerUser,
+    hashUserPassword,
 }

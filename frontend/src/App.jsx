@@ -5,6 +5,7 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import Login from './pages/System/Login/Login';
+import Register from './pages/System/Login/Register';
 import Home from './pages/Home';
 import System from './pages/System/System';
 import Doctor from './pages/Doctor/Doctor';
@@ -25,27 +26,8 @@ function App() {
           <main className="content-container">
             <Routes>
 
+              {/* ===== PUBLIC ROUTES ===== */}
               <Route path="/home" element={<Home />} />
-
-              {/* Trang chi tiết bác sĩ */}
-              <Route path="/doctor-profile/:id" element={
-                <DefaultLayout><DoctorDetail /></DefaultLayout>
-              } />
-
-              {/* Lịch hẹn của bệnh nhân */}
-              <Route path="/my-bookings" element={
-                isLoggedIn
-                  ? <DefaultLayout><MyBookings /></DefaultLayout>
-                  : <Navigate to="/login" />
-              } />
-
-              {/* Xác nhận lịch qua email - PUBLIC, không cần đăng nhập */}
-              <Route path="/confirm-booking" element={<ConfirmBooking />} />
-
-              {/* Trang đặt lịch 4 bước - PUBLIC */}
-              <Route path="/booking" element={
-                <DefaultLayout><BookingPage /></DefaultLayout>
-              } />
 
               <Route path="/login" element={
                 !isLoggedIn ? <Login /> : (
@@ -53,27 +35,55 @@ function App() {
                     userInfo?.roleId === 'R1' ? '/system'
                       : userInfo?.roleId === 'R2' ? '/doctor'
                         : '/home'
-                  } />
+                  } replace />
                 )
+              } />
+
+              {/* 🔥 FIX QUAN TRỌNG */}
+              <Route path="/register" element={
+                !isLoggedIn ? <Register /> : (
+                  <Navigate to="/home" replace />
+                )
+              } />
+
+              <Route path="/confirm-booking" element={<ConfirmBooking />} />
+
+              <Route path="/booking" element={
+                <DefaultLayout><BookingPage /></DefaultLayout>
+              } />
+
+              <Route path="/doctor-profile/:id" element={
+                <DefaultLayout><DoctorDetail /></DefaultLayout>
+              } />
+
+              <Route path="/payment-result" element={<PaymentResult />} />
+
+              {/* ===== PRIVATE ROUTES ===== */}
+              <Route path="/my-bookings" element={
+                isLoggedIn
+                  ? <DefaultLayout><MyBookings /></DefaultLayout>
+                  : <Navigate to="/login" replace />
               } />
 
               <Route path="/system/*" element={
                 isLoggedIn && userInfo?.roleId === 'R1'
                   ? <DefaultLayout><System /></DefaultLayout>
-                  : <Navigate to="/login" />
+                  : <Navigate to="/login" replace />
               } />
 
               <Route path="/doctor/*" element={
                 isLoggedIn && userInfo?.roleId === 'R2'
                   ? <DefaultLayout><Doctor /></DefaultLayout>
-                  : <Navigate to="/login" />
+                  : <Navigate to="/login" replace />
               } />
-              <Route path="/payment-result" element={<PaymentResult />} />
-              <Route path="/" element={<Navigate to="/home" />} />
-              <Route path="*" element={<Navigate to="/home" />} />
+
+              {/* ===== DEFAULT ===== */}
+              <Route path="/" element={<Navigate to="/home" replace />} />
+              <Route path="*" element={<Navigate to="/home" replace />} />
 
             </Routes>
           </main>
+
           <ToastContainer position="bottom-right" autoClose={3000} />
         </div>
       </Router>

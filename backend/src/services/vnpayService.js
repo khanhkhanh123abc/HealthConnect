@@ -169,11 +169,11 @@ const createRefund = async (booking) => {
         const now = getVNTime();
 
         const result = await vnpay.refund({
-            vnp_Amount: booking.price * 100,
+            vnp_Amount: booking.price,
             vnp_TransactionType: VnpTransactionType.FULL_REFUND,
             vnp_TxnRef: booking.vnpTxnRef,
-            vnp_TransactionNo: parseInt(booking.vnpTransactionNo),
-            vnp_TransactionDate: parseInt(booking.vnpTransactionDate),
+            vnp_TransactionNo: booking.vnpTransactionNo,
+            vnp_TransactionDate: booking.vnpTransactionDate,
             vnp_CreateBy: 'HealthConnect',
             vnp_CreateDate: formatVNPayDate(now),
             vnp_IpAddr: '127.0.0.1',

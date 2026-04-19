@@ -1,4 +1,4 @@
-import { VNPay, VnpLocale } from 'vnpay';
+import { VNPay, VnpLocale, VnpTransactionType } from 'vnpay';
 import moment from 'moment-timezone';
 
 const vnpay = new VNPay({
@@ -170,7 +170,7 @@ const createRefund = async (booking) => {
 
         const result = await vnpay.refund({
             vnp_Amount: booking.price * 100,
-            vnp_TransactionType: '02',
+            vnp_TransactionType: VnpTransactionType.FULL_REFUND,
             vnp_TxnRef: booking.vnpTxnRef,
             vnp_TransactionNo: booking.vnpTransactionNo,
             vnp_TransactionDate: booking.vnpTransactionDate,
@@ -178,6 +178,7 @@ const createRefund = async (booking) => {
             vnp_CreateDate: formatVNPayDate(now),
             vnp_IpAddr: '127.0.0.1',
             vnp_OrderInfo: `Hoan tien lich kham #${booking.id}`,
+            vnp_RequestId: `RF${booking.id}_${Date.now()}`,
         });
 
         console.log('[Refund] Response:', result);

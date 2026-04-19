@@ -89,13 +89,13 @@ const handleVNPayIPN = async (vnpParams) => {
                     where: { keyMap: booking.timeType, type: 'TIME' },
                     attributes: ['value'], raw: true
                 });
-                const DAY_LABELS = ['Chủ nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
+                const DAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
                 const d = moment(booking.date).tz('Asia/Ho_Chi_Minh');
-                const dateStr = `${DAY_LABELS[d.day()]}, ${d.date()}/${d.month()+1}/${d.year()}`;
+                const dateStr = `${DAY_LABELS[d.day()]}, ${d.date()}/${d.month() + 1}/${d.year()}`;
                 await sendBankTransferConfirmedEmail({
                     patientEmail: patient?.email,
-                    patientName: `${patient?.lastName||''} ${patient?.firstName||''}`.trim(),
-                    doctorName: `BS. ${doctor?.lastName||''} ${doctor?.firstName||''}`.trim(),
+                    patientName: `${patient?.lastName || ''} ${patient?.firstName || ''}`.trim(),
+                    doctorName: `BS. ${doctor?.lastName || ''} ${doctor?.firstName || ''}`.trim(),
                     timeValue: timeTypeData?.value || booking.timeType,
                     dateStr,
                 });
@@ -152,13 +152,13 @@ const handleVNPayReturn = async (vnpParams) => {
                                 where: { keyMap: booking.timeType, type: 'TIME' },
                                 attributes: ['value'], raw: true
                             });
-                            const DAY_LABELS = ['Chủ nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
+                            const DAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
                             const d = new Date(booking.date);
-                            const dateStr = `${DAY_LABELS[d.getDay()]}, ${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+                            const dateStr = `${DAY_LABELS[d.getDay()]}, ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
                             await sendBankTransferConfirmedEmail({
                                 patientEmail: patient?.email,
-                                patientName: `${patient?.lastName||''} ${patient?.firstName||''}`.trim(),
-                                doctorName: `BS. ${doctor?.lastName||''} ${doctor?.firstName||''}`.trim(),
+                                patientName: `${patient?.lastName || ''} ${patient?.firstName || ''}`.trim(),
+                                doctorName: `BS. ${doctor?.lastName || ''} ${doctor?.firstName || ''}`.trim(),
                                 timeValue: timeTypeData?.value || booking.timeType,
                                 dateStr,
                             });
@@ -185,35 +185,87 @@ const handleVNPayReturn = async (vnpParams) => {
 // ===== 4. GỌI REFUND =====
 const createRefund = async (booking) => {
     try {
-        if (!booking.vnpTransactionNo || !booking.vnpTransactionDate || !booking.vnpTxnRef) {
-            return { success: false, message: 'Thiếu dữ liệu VNPay' };
+        // 1. Validate dữ liệu đầu vào
+        if (!booking) {
+            return { success: false, message: 'Booking không tồn tại' };
+        }
+
+        const {
+            id,
+            price,
+            vnpTxnRef,
+            vnpTransactionNo,
+            vnpTransactionDate,
+        } = booking;
+
+        if (!vnpTxnRef || !vnpTransactionNo || !vnpTransactionDate) {
+            return {
+                success: false,
+                message: 'Thiếu dữ liệu VNPay (TxnRef / TransactionNo / TransactionDate)',
+            };
+        }
+
+        if (!price || price <= 0) {
+            return {
+                success: false,
+                message: 'Số tiền không hợp lệ',
+            };
         }
 
         const now = getVNTime();
 
+        console.log('[REFUND REQUEST]', {
+            bookingId: id,
+            amount: price * 100,
+            txnRef: vnpTxnRef,
+            transactionNo: vnpTransactionNo,
+            transactionDate: vnpTransactionDate,
+        });
+
+        // 3. Gọi VNPay refund
         const refundResult = await vnpay.refund({
-            vnp_Amount: booking.price * 100, // ✅ FIX
-            vnp_TransactionType: '02',
-            vnp_TxnRef: booking.vnpTxnRef,   // ✅ FIX
-            vnp_TransactionNo: booking.vnpTransactionNo,
-            vnp_TransactionDate: booking.vnpTransactionDate,
+            vnp_Amount: price * 100,              
+            vnp_TransactionType: '02',            
+            vnp_TxnRef: vnpTxnRef,                
+            vnp_TransactionNo: vnpTransactionNo,
+            vnp_TransactionDate: vnpTransactionDate,
             vnp_CreateBy: 'HealthConnect',
             vnp_CreateDate: formatVNPayDate(now),
             vnp_IpAddr: '127.0.0.1',
-            vnp_OrderInfo: `Hoan tien lich kham #${booking.id}`,
+            vnp_OrderInfo: `Hoan tien lich kham #${id}`,
         });
 
-        console.log('[Refund]', refundResult);
+        // 4. Log response
+        console.log('[REFUND RESPONSE]', refundResult);
 
-        if (refundResult?.vnp_ResponseCode === '00') {
-            return { success: true };
+        // 5. Xử lý kết quả chuẩn VNPay
+        const responseCode = refundResult?.vnp_ResponseCode;
+        const message = refundResult?.vnp_Message || 'Unknown error';
+
+        if (responseCode === '00') {
+            return {
+                success: true,
+                refundAmount: price,
+                message: 'Hoàn tiền thành công',
+                raw: refundResult, // giữ lại để debug khi cần
+            };
         }
 
-        return { success: false, message: refundResult?.vnp_Message };
+        // 6. Handle fail chi tiết hơn
+        return {
+            success: false,
+            message: message,
+            code: responseCode,
+            raw: refundResult,
+        };
 
-    } catch (e) {
-        console.error('[Refund ERROR]', e);
-        return { success: false, message: e.message };
+    } catch (error) {
+        console.error('[REFUND ERROR]', error);
+
+        return {
+            success: false,
+            message: error.message || 'Lỗi khi gọi VNPay refund',
+        };
     }
 };
 

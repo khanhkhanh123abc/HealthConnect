@@ -185,18 +185,16 @@ const handleVNPayReturn = async (vnpParams) => {
 // ===== 4. GỌI REFUND =====
 const createRefund = async (booking) => {
     try {
-        if (!booking.vnpTransactionNo || !booking.vnpTransactionDate) {
-            return { success: false, message: 'Thiếu thông tin giao dịch VNPay để hoàn tiền' };
+        if (!booking.vnpTransactionNo || !booking.vnpTransactionDate || !booking.vnpTxnRef) {
+            return { success: false, message: 'Thiếu dữ liệu VNPay' };
         }
 
-        const refundAmount = booking.price; // hoàn 100%
         const now = getVNTime();
 
-        // Gọi VNPay Refund API
         const refundResult = await vnpay.refund({
-            vnp_Amount: refundAmount,
-            vnp_TransactionType: '02',          // 02 = hoàn toàn phần
-            vnp_TxnRef: `HC${booking.id}${booking.vnpTransactionDate}`, // TxnRef gốc
+            vnp_Amount: booking.price * 100, // ✅ FIX
+            vnp_TransactionType: '02',
+            vnp_TxnRef: booking.vnpTxnRef,   // ✅ FIX
             vnp_TransactionNo: booking.vnpTransactionNo,
             vnp_TransactionDate: booking.vnpTransactionDate,
             vnp_CreateBy: 'HealthConnect',
@@ -205,19 +203,17 @@ const createRefund = async (booking) => {
             vnp_OrderInfo: `Hoan tien lich kham #${booking.id}`,
         });
 
-        console.log('[Refund] VNPay response:', JSON.stringify(refundResult));
+        console.log('[Refund]', refundResult);
 
-        // Kiểm tra kết quả
-        if (refundResult && (refundResult.vnp_ResponseCode === '00' || refundResult.isSuccess)) {
-            return { success: true, refundAmount, message: 'Hoàn tiền thành công' };
-        } else {
-            const errMsg = refundResult?.vnp_Message || 'VNPay từ chối hoàn tiền';
-            console.error('[Refund] Failed:', errMsg);
-            return { success: false, message: errMsg };
+        if (refundResult?.vnp_ResponseCode === '00') {
+            return { success: true };
         }
+
+        return { success: false, message: refundResult?.vnp_Message };
+
     } catch (e) {
-        console.error('[Refund] Error:', e);
-        return { success: false, message: e.message || 'Lỗi khi gọi VNPay Refund' };
+        console.error('[Refund ERROR]', e);
+        return { success: false, message: e.message };
     }
 };
 

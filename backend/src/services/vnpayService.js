@@ -185,86 +185,47 @@ const handleVNPayReturn = async (vnpParams) => {
 // ===== 4. GỌI REFUND =====
 const createRefund = async (booking) => {
     try {
-        // 1. Validate dữ liệu đầu vào
-        if (!booking) {
-            return { success: false, message: 'Booking không tồn tại' };
-        }
-
-        const {
-            id,
-            price,
-            vnpTxnRef,
-            vnpTransactionNo,
-            vnpTransactionDate,
-        } = booking;
-
-        if (!vnpTxnRef || !vnpTransactionNo || !vnpTransactionDate) {
+        if (!booking.vnpTransactionNo || !booking.vnpTransactionDate || !booking.vnpTxnRef) {
             return {
                 success: false,
-                message: 'Thiếu dữ liệu VNPay (TxnRef / TransactionNo / TransactionDate)',
-            };
-        }
-
-        if (!price || price <= 0) {
-            return {
-                success: false,
-                message: 'Số tiền không hợp lệ',
+                message: 'Thiếu dữ liệu VNPay (TxnRef / TransactionNo / Date)'
             };
         }
 
         const now = getVNTime();
 
-        console.log('[REFUND REQUEST]', {
-            bookingId: id,
-            amount: price * 100,
-            txnRef: vnpTxnRef,
-            transactionNo: vnpTransactionNo,
-            transactionDate: vnpTransactionDate,
-        });
-
-        // 3. Gọi VNPay refund
         const refundResult = await vnpay.refund({
-            vnp_Amount: price * 100,              
-            vnp_TransactionType: '02',            
-            vnp_TxnRef: vnpTxnRef,                
-            vnp_TransactionNo: vnpTransactionNo,
-            vnp_TransactionDate: vnpTransactionDate,
+            vnp_Amount: booking.price * 100, // VNPay yêu cầu x100
+            vnp_TransactionType: '02',
+            vnp_TxnRef: booking.vnpTxnRef,
+            vnp_TransactionNo: booking.vnpTransactionNo,
+            vnp_TransactionDate: booking.vnpTransactionDate,
             vnp_CreateBy: 'HealthConnect',
             vnp_CreateDate: formatVNPayDate(now),
             vnp_IpAddr: '127.0.0.1',
-            vnp_OrderInfo: `Hoan tien lich kham #${id}`,
+            vnp_OrderInfo: `Hoan tien lich kham #${booking.id}`,
         });
 
-        // 4. Log response
-        console.log('[REFUND RESPONSE]', refundResult);
+        console.log('[Refund] Response:', refundResult);
 
-        // 5. Xử lý kết quả chuẩn VNPay
-        const responseCode = refundResult?.vnp_ResponseCode;
-        const message = refundResult?.vnp_Message || 'Unknown error';
-
-        if (responseCode === '00') {
+        if (refundResult?.vnp_ResponseCode === '00' || refundResult?.isSuccess) {
             return {
                 success: true,
-                refundAmount: price,
-                message: 'Hoàn tiền thành công',
-                raw: refundResult, // giữ lại để debug khi cần
+                refundAmount: booking.price,
+                message: 'Hoàn tiền thành công'
             };
         }
 
-        // 6. Handle fail chi tiết hơn
         return {
             success: false,
-            message: message,
-            code: responseCode,
-            raw: refundResult,
+            message: refundResult?.vnp_Message || 'VNPay refund failed'
         };
 
-    } catch (error) {
-        console.error('[REFUND ERROR]', error);
-
+    } catch (e) {
+        console.error('[Refund ERROR]', e);
         return {
             success: false,
-            message: error.message || 'Lỗi khi gọi VNPay refund',
+            message: e.message || 'Refund exception'
         };
     }
 };

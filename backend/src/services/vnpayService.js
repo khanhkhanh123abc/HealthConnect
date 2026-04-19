@@ -168,7 +168,7 @@ const createRefund = async (booking) => {
 
         const now = getVNTime();
 
-        const result = await vnpay.refund({
+        const refundParams = {
             vnp_Amount: booking.price,
             vnp_TransactionType: VnpTransactionType.FULL_REFUND,
             vnp_TxnRef: booking.vnpTxnRef,
@@ -177,9 +177,12 @@ const createRefund = async (booking) => {
             vnp_CreateBy: 'HealthConnect',
             vnp_CreateDate: formatVNPayDate(now),
             vnp_IpAddr: '127.0.0.1',
-            vnp_OrderInfo: `Hoan tien lich kham #${booking.id}`,
-            vnp_RequestId: `RF${booking.id}_${Date.now()}`,
-        });
+            vnp_OrderInfo: `Hoan tien lich kham ${booking.id}`,
+            vnp_RequestId: `RF${booking.id}${Date.now()}`,
+        };
+        console.log('[Refund] Params:', JSON.stringify(refundParams, null, 2));
+
+        const result = await vnpay.refund(refundParams);
 
         console.log('[Refund] Response:', result);
 

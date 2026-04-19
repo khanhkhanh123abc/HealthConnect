@@ -156,4 +156,19 @@ let vnpayReturn = async (req, res) => {
         return res.redirect(`${frontendUrl}/payment-result?status=error`);
     }
 };
-module.exports = { createBooking, confirmBooking, getBookingsByPatient, cancelBooking, getScheduleWithSlots, getBookingsByDoctor, completeBooking, sendMedicalRecord, confirmPayment, getPendingBankBookings, createVNPayPayment, vnpayIPN, vnpayReturn }
+module.exports = {
+    createBooking,
+    doctorCancelBooking,
+    confirmBooking,
+    getBookingsByPatient,
+    cancelBooking,
+    getScheduleWithSlots,
+    getBookingsByDoctor,
+    completeBooking,
+    sendMedicalRecord,
+    confirmPayment,
+    getPendingBankBookings,
+    createVNPayPayment,
+    vnpayIPN,
+    vnpayReturn,
+}

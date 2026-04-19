@@ -186,7 +186,9 @@ const createRefund = async (booking) => {
         if (result?.vnp_ResponseCode === '00' || result?.isSuccess) {
             return {
                 success: true,
-                refundAmount: booking.price
+                refundAmount: booking.price,
+                vpn_message: result.vnp_Message,
+                isPending: result.vnp_TransactionStatus === '05'
             };
         }
 

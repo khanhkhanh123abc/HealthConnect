@@ -341,52 +341,56 @@ let cancelBooking = (bookingId, patientId) => {
         try {
             if (!bookingId || !patientId) {
                 await t.rollback();
-                resolve({ errCode: 1, errMessage: 'Missing required parameters' });
-                return;
+                return resolve({ errCode: 1, errMessage: 'Missing required parameters' });
             }
 
             const BookingModel = db.Booking || db.Bookings;
+
             let booking = await BookingModel.findOne({
                 where: { id: bookingId, patientId },
-                transaction: t, raw: false
+                transaction: t,
+                raw: false
             });
 
             if (!booking) {
                 await t.rollback();
-                resolve({ errCode: 2, errMessage: 'Không tìm thấy lịch hẹn!' });
-                return;
+                return resolve({ errCode: 2, errMessage: 'Không tìm thấy lịch hẹn!' });
             }
 
-            // ✅ MỚI: cho phép hủy cả S1 và S2
             if (!['S1', 'S2'].includes(booking.statusId)) {
                 await t.rollback();
-                resolve({ errCode: 3, errMessage: 'Không thể hủy lịch ở trạng thái này!' });
-                return;
+                return resolve({ errCode: 3, errMessage: 'Không thể hủy lịch ở trạng thái này!' });
             }
 
-            const wasConfirmed = booking.statusId === 'S2';
-            const needRefund = wasConfirmed && booking.paymentMethod === 'BANK' && booking.vnpTransactionNo;
+            const isPaid = booking.statusId === 'S2' && booking.paymentMethod === 'BANK';
 
-            // ✅ Hoàn tiền nếu đã thanh toán VNPay
             let refundResult = null;
-            if (needRefund) {
+
+            // ===== CASE 1: ĐÃ THANH TOÁN → PHẢI REFUND =====
+            if (isPaid) {
                 refundResult = await createRefund(booking);
-                if (refundResult.success) {
-                    booking.refundAmount = refundResult.refundAmount;
-                    booking.refundStatus = 'REFUNDED';
-                } else {
-                    // Refund thất bại → vẫn hủy nhưng ghi nhận
-                    booking.refundStatus = 'FAILED';
-                    console.error(`[Cancel] Refund failed for booking #${bookingId}:`, refundResult.message);
+
+                if (!refundResult.success) {
+                    await t.rollback();
+                    return resolve({
+                        errCode: 4,
+                        errMessage: 'Hoàn tiền thất bại: ' + refundResult.message
+                    });
                 }
+
+                // ✅ Refund OK → cập nhật trạng thái refund
+                booking.refundAmount = refundResult.refundAmount || booking.price;
+                booking.refundStatus = refundResult.isPending ? 'PENDING' : 'REFUNDED';
             }
 
+            // ===== UPDATE BOOKING =====
             booking.statusId = 'S4';
             await booking.save({ transaction: t });
 
-            // Trả lại slot
+            // ===== TRẢ SLOT =====
             let dateStart = new Date(booking.date);
             dateStart.setHours(0, 0, 0, 0);
+
             let dateEnd = new Date(booking.date);
             dateEnd.setHours(23, 59, 59, 999);
 
@@ -396,63 +400,69 @@ let cancelBooking = (bookingId, patientId) => {
                     date: { [Op.between]: [dateStart, dateEnd] },
                     timeType: booking.timeType
                 },
-                transaction: t, raw: false
+                transaction: t,
+                raw: false
             });
+
             if (schedule && schedule.currentNumber > 0) {
                 schedule.currentNumber -= 1;
                 await schedule.save({ transaction: t });
             }
+
             await t.commit();
 
-            // Gửi email hủy (non-blocking)
+            // ===== EMAIL (NON-BLOCKING) =====
             (async () => {
                 try {
                     let patient = await db.User.findOne({
                         where: { id: patientId },
-                        attributes: ['firstName', 'lastName', 'email'], raw: true
-                    });
-                    let doctor = await db.User.findOne({
-                        where: { id: booking.doctorId },
-                        attributes: ['firstName', 'lastName'], raw: true
-                    });
-                    let timeTypeData = await db.allCode.findOne({
-                        where: { keyMap: booking.timeType, type: 'TIME' },
-                        attributes: ['value'], raw: true
+                        attributes: ['firstName', 'lastName', 'email'],
+                        raw: true
                     });
 
-                    const refundNote = refundResult?.success
-                        ? `\nSố tiền ${refundResult.refundAmount.toLocaleString('vi-VN')}đ sẽ được hoàn về tài khoản của bạn trong 5-7 ngày làm việc.`
+                    let doctor = await db.User.findOne({
+                        where: { id: booking.doctorId },
+                        attributes: ['firstName', 'lastName'],
+                        raw: true
+                    });
+
+                    let timeTypeData = await db.allCode.findOne({
+                        where: { keyMap: booking.timeType, type: 'TIME' },
+                        attributes: ['value'],
+                        raw: true
+                    });
+
+                    const refundNote = isPaid
+                        ? `\nSố tiền ${booking.refundAmount.toLocaleString('vi-VN')}đ đang được xử lý hoàn về tài khoản của bạn.`
                         : '';
 
                     await sendCancelEmail({
                         patientEmail: patient?.email,
-                        patientName: patient
-                            ? `${patient.lastName || ''} ${patient.firstName || ''}`.trim()
-                            : 'Bạn',
-                        doctorName: doctor
-                            ? `BS. ${doctor.lastName || ''} ${doctor.firstName || ''}`.trim()
-                            : 'Bác sĩ',
+                        patientName: `${patient?.lastName || ''} ${patient?.firstName || ''}`.trim(),
+                        doctorName: `BS. ${doctor?.lastName || ''} ${doctor?.firstName || ''}`.trim(),
                         timeValue: timeTypeData?.value || booking.timeType,
                         dateStr: formatDate(booking.date),
-                        refundNote,
+                        refundNote
                     });
-                } catch (_e) { }
+
+                } catch (e) {
+                    console.error('Send cancel email error:', e.message);
+                }
             })();
 
-            // Response
+            // ===== RESPONSE =====
             let message = 'Hủy lịch thành công!';
-            if (refundResult?.success) {
-                message += ` Hoàn tiền ${refundResult.refundAmount.toLocaleString('vi-VN')}đ đang xử lý.`;
-            } else if (needRefund && !refundResult?.success) {
-                message += ' Hoàn tiền tự động thất bại, vui lòng liên hệ hỗ trợ.';
+            if (isPaid) {
+                message += ' Yêu cầu hoàn tiền đã được gửi.';
             }
 
-            resolve({
+            return resolve({
                 errCode: 0,
                 errMessage: message,
                 refundStatus: booking.refundStatus,
                 refundAmount: booking.refundAmount
             });
+
         } catch (e) {
             await t.rollback();
             reject(e);
@@ -467,47 +477,55 @@ let doctorCancelBooking = (bookingId, doctorId, cancelReason) => {
         try {
             if (!bookingId || !doctorId) {
                 await t.rollback();
-                resolve({ errCode: 1, errMessage: 'Missing parameters' });
-                return;
+                return resolve({ errCode: 1, errMessage: 'Missing parameters' });
             }
 
             const BookingModel = db.Booking || db.Bookings;
+
             let booking = await BookingModel.findOne({
                 where: { id: bookingId, doctorId },
-                transaction: t, raw: false
+                transaction: t,
+                raw: false
             });
 
             if (!booking) {
                 await t.rollback();
-                resolve({ errCode: 2, errMessage: 'Không tìm thấy lịch hẹn!' });
-                return;
+                return resolve({ errCode: 2, errMessage: 'Không tìm thấy lịch hẹn!' });
             }
+
             if (!['S1', 'S2'].includes(booking.statusId)) {
                 await t.rollback();
-                resolve({ errCode: 3, errMessage: 'Không thể hủy lịch ở trạng thái này!' });
-                return;
+                return resolve({ errCode: 3, errMessage: 'Không thể hủy lịch ở trạng thái này!' });
             }
 
-            const needRefund = booking.statusId === 'S2' && booking.paymentMethod === 'BANK' && booking.vnpTransactionNo;
+            const isPaid = booking.statusId === 'S2' && booking.paymentMethod === 'BANK';
 
-            // Hoàn tiền nếu cần
             let refundResult = null;
-            if (needRefund) {
+
+            // ===== REFUND =====
+            if (isPaid) {
                 refundResult = await createRefund(booking);
-                if (refundResult.success) {
-                    booking.refundAmount = refundResult.refundAmount;
-                    booking.refundStatus = 'REFUNDED';
-                } else {
-                    booking.refundStatus = 'FAILED';
+
+                if (!refundResult.success) {
+                    await t.rollback();
+                    return resolve({
+                        errCode: 4,
+                        errMessage: 'Hoàn tiền thất bại: ' + refundResult.message
+                    });
                 }
+
+                booking.refundAmount = refundResult.refundAmount || booking.price;
+                booking.refundStatus = refundResult.isPending ? 'PENDING' : 'REFUNDED';
             }
 
+            // ===== HỦY LỊCH =====
             booking.statusId = 'S4';
             await booking.save({ transaction: t });
 
-            // Trả slot
+            // ===== TRẢ SLOT =====
             let dateStart = new Date(booking.date);
             dateStart.setHours(0, 0, 0, 0);
+
             let dateEnd = new Date(booking.date);
             dateEnd.setHours(23, 59, 59, 999);
 
@@ -517,54 +535,68 @@ let doctorCancelBooking = (bookingId, doctorId, cancelReason) => {
                     date: { [Op.between]: [dateStart, dateEnd] },
                     timeType: booking.timeType
                 },
-                transaction: t, raw: false
+                transaction: t,
+                raw: false
             });
+
             if (schedule && schedule.currentNumber > 0) {
                 schedule.currentNumber -= 1;
                 await schedule.save({ transaction: t });
             }
+
             await t.commit();
 
-            // Email thông báo cho bệnh nhân
+            // ===== EMAIL =====
             (async () => {
                 try {
                     let patient = await db.User.findOne({
                         where: { id: booking.patientId },
-                        attributes: ['firstName', 'lastName', 'email'], raw: true
-                    });
-                    let doctor = await db.User.findOne({
-                        where: { id: doctorId },
-                        attributes: ['firstName', 'lastName'], raw: true
-                    });
-                    let timeTypeData = await db.allCode.findOne({
-                        where: { keyMap: booking.timeType, type: 'TIME' },
-                        attributes: ['value'], raw: true
+                        attributes: ['firstName', 'lastName', 'email'],
+                        raw: true
                     });
 
-                    const refundNote = refundResult?.success
-                        ? `\nSố tiền ${refundResult.refundAmount.toLocaleString('vi-VN')}đ sẽ được hoàn về tài khoản của bạn trong 5-7 ngày làm việc.`
+                    let doctor = await db.User.findOne({
+                        where: { id: doctorId },
+                        attributes: ['firstName', 'lastName'],
+                        raw: true
+                    });
+
+                    let timeTypeData = await db.allCode.findOne({
+                        where: { keyMap: booking.timeType, type: 'TIME' },
+                        attributes: ['value'],
+                        raw: true
+                    });
+
+                    const refundNote = isPaid
+                        ? `\nSố tiền ${booking.refundAmount.toLocaleString('vi-VN')}đ đang được xử lý hoàn về tài khoản của bạn.`
                         : '';
 
                     await sendCancelEmail({
                         patientEmail: patient?.email,
-                        patientName: patient
-                            ? `${patient.lastName || ''} ${patient.firstName || ''}`.trim()
-                            : 'Bạn',
-                        doctorName: doctor
-                            ? `BS. ${doctor.lastName || ''} ${doctor.firstName || ''}`.trim()
-                            : 'Bác sĩ',
+                        patientName: `${patient?.lastName || ''} ${patient?.firstName || ''}`.trim(),
+                        doctorName: `BS. ${doctor?.lastName || ''} ${doctor?.firstName || ''}`.trim(),
                         timeValue: timeTypeData?.value || booking.timeType,
                         dateStr: formatDate(booking.date),
                         refundNote,
-                        cancelReason: cancelReason || 'Bác sĩ hủy lịch',
+                        cancelReason: cancelReason || 'Bác sĩ hủy lịch'
                     });
-                } catch (_e) { }
+
+                } catch (e) {
+                    console.error('Doctor cancel email error:', e.message);
+                }
             })();
 
-            let message = 'Hủy lịch thành công!';
-            if (refundResult?.success) message += ` Hoàn tiền đang xử lý.`;
+            // ===== RESPONSE =====
+            let message = 'Bác sĩ đã hủy lịch thành công!';
+            if (isPaid) message += ' Yêu cầu hoàn tiền đã được gửi.';
 
-            resolve({ errCode: 0, errMessage: message });
+            return resolve({
+                errCode: 0,
+                errMessage: message,
+                refundStatus: booking.refundStatus,
+                refundAmount: booking.refundAmount
+            });
+
         } catch (e) {
             await t.rollback();
             reject(e);

@@ -39,6 +39,11 @@ module.exports = (sequelize, DataTypes) => {
         reason: DataTypes.TEXT,
         token: DataTypes.STRING,
         paymentMethod: DataTypes.STRING,
+        price: DataTypes.INTEGER,
+        vnpTransactionNo: DataTypes.STRING,
+        vnpTransactionDate: DataTypes.STRING,
+        refundAmount: DataTypes.INTEGER,
+        refundStatus: DataTypes.STRING,
     }, {
         sequelize,
         modelName: 'Bookings',

@@ -3,6 +3,7 @@ import { Op } from 'sequelize';
 import { v4 as uuidv4 } from 'uuid';
 import { sendBookingConfirmEmail, sendCancelEmail } from './emailService';
 import { convertUsdToVnd } from './currencyService';
+import { createRefund } from './vnpayService';
 
 const DAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
@@ -334,6 +335,10 @@ let getBookingsByPatient = (patientId) => {
     });
 };
 
+// ===== THÊM import ở đầu file =====
+import { createRefund } from './vnpayService';
+
+// ===== THAY THẾ hàm cancelBooking cũ =====
 let cancelBooking = (bookingId, patientId) => {
     return new Promise(async (resolve, reject) => {
         const t = await db.sequelize.transaction();
@@ -355,15 +360,35 @@ let cancelBooking = (bookingId, patientId) => {
                 resolve({ errCode: 2, errMessage: 'Không tìm thấy lịch hẹn!' });
                 return;
             }
-            if (booking.statusId !== 'S1') {
+
+            // ✅ MỚI: cho phép hủy cả S1 và S2
+            if (!['S1', 'S2'].includes(booking.statusId)) {
                 await t.rollback();
-                resolve({ errCode: 3, errMessage: 'Chỉ có thể hủy lịch đang chờ xác nhận!' });
+                resolve({ errCode: 3, errMessage: 'Không thể hủy lịch ở trạng thái này!' });
                 return;
+            }
+
+            const wasConfirmed = booking.statusId === 'S2';
+            const needRefund = wasConfirmed && booking.paymentMethod === 'BANK' && booking.vnpTransactionNo;
+
+            // ✅ Hoàn tiền nếu đã thanh toán VNPay
+            let refundResult = null;
+            if (needRefund) {
+                refundResult = await createRefund(booking);
+                if (refundResult.success) {
+                    booking.refundAmount = refundResult.refundAmount;
+                    booking.refundStatus = 'REFUNDED';
+                } else {
+                    // Refund thất bại → vẫn hủy nhưng ghi nhận
+                    booking.refundStatus = 'FAILED';
+                    console.error(`[Cancel] Refund failed for booking #${bookingId}:`, refundResult.message);
+                }
             }
 
             booking.statusId = 'S4';
             await booking.save({ transaction: t });
 
+            // Trả lại slot
             let dateStart = new Date(booking.date);
             dateStart.setHours(0, 0, 0, 0);
             let dateEnd = new Date(booking.date);
@@ -383,7 +408,7 @@ let cancelBooking = (bookingId, patientId) => {
             }
             await t.commit();
 
-            // Gửi email thông báo hủy (non-blocking)
+            // Gửi email hủy (non-blocking)
             (async () => {
                 try {
                     let patient = await db.User.findOne({
@@ -398,6 +423,11 @@ let cancelBooking = (bookingId, patientId) => {
                         where: { keyMap: booking.timeType, type: 'TIME' },
                         attributes: ['value'], raw: true
                     });
+
+                    const refundNote = refundResult?.success
+                        ? `\nSố tiền ${refundResult.refundAmount.toLocaleString('vi-VN')}đ sẽ được hoàn về tài khoản của bạn trong 5-7 ngày làm việc.`
+                        : '';
+
                     await sendCancelEmail({
                         patientEmail: patient?.email,
                         patientName: patient
@@ -407,12 +437,138 @@ let cancelBooking = (bookingId, patientId) => {
                             ? `BS. ${doctor.lastName || ''} ${doctor.firstName || ''}`.trim()
                             : 'Bác sĩ',
                         timeValue: timeTypeData?.value || booking.timeType,
-                        dateStr: formatDate(booking.date)
+                        dateStr: formatDate(booking.date),
+                        refundNote,
                     });
                 } catch (_e) { }
             })();
 
-            resolve({ errCode: 0, errMessage: 'Hủy lịch thành công!' });
+            // Response
+            let message = 'Hủy lịch thành công!';
+            if (refundResult?.success) {
+                message += ` Hoàn tiền ${refundResult.refundAmount.toLocaleString('vi-VN')}đ đang xử lý.`;
+            } else if (needRefund && !refundResult?.success) {
+                message += ' Hoàn tiền tự động thất bại, vui lòng liên hệ hỗ trợ.';
+            }
+
+            resolve({
+                errCode: 0,
+                errMessage: message,
+                refundStatus: booking.refundStatus,
+                refundAmount: booking.refundAmount
+            });
+        } catch (e) {
+            await t.rollback();
+            reject(e);
+        }
+    });
+};
+
+// ===== THÊM MỚI: Bác sĩ hủy lịch =====
+let doctorCancelBooking = (bookingId, doctorId, cancelReason) => {
+    return new Promise(async (resolve, reject) => {
+        const t = await db.sequelize.transaction();
+        try {
+            if (!bookingId || !doctorId) {
+                await t.rollback();
+                resolve({ errCode: 1, errMessage: 'Missing parameters' });
+                return;
+            }
+
+            const BookingModel = db.Booking || db.Bookings;
+            let booking = await BookingModel.findOne({
+                where: { id: bookingId, doctorId },
+                transaction: t, raw: false
+            });
+
+            if (!booking) {
+                await t.rollback();
+                resolve({ errCode: 2, errMessage: 'Không tìm thấy lịch hẹn!' });
+                return;
+            }
+            if (!['S1', 'S2'].includes(booking.statusId)) {
+                await t.rollback();
+                resolve({ errCode: 3, errMessage: 'Không thể hủy lịch ở trạng thái này!' });
+                return;
+            }
+
+            const needRefund = booking.statusId === 'S2' && booking.paymentMethod === 'BANK' && booking.vnpTransactionNo;
+
+            // Hoàn tiền nếu cần
+            let refundResult = null;
+            if (needRefund) {
+                refundResult = await createRefund(booking);
+                if (refundResult.success) {
+                    booking.refundAmount = refundResult.refundAmount;
+                    booking.refundStatus = 'REFUNDED';
+                } else {
+                    booking.refundStatus = 'FAILED';
+                }
+            }
+
+            booking.statusId = 'S4';
+            await booking.save({ transaction: t });
+
+            // Trả slot
+            let dateStart = new Date(booking.date);
+            dateStart.setHours(0, 0, 0, 0);
+            let dateEnd = new Date(booking.date);
+            dateEnd.setHours(23, 59, 59, 999);
+
+            let schedule = await db.Schedule.findOne({
+                where: {
+                    doctorId: booking.doctorId,
+                    date: { [Op.between]: [dateStart, dateEnd] },
+                    timeType: booking.timeType
+                },
+                transaction: t, raw: false
+            });
+            if (schedule && schedule.currentNumber > 0) {
+                schedule.currentNumber -= 1;
+                await schedule.save({ transaction: t });
+            }
+            await t.commit();
+
+            // Email thông báo cho bệnh nhân
+            (async () => {
+                try {
+                    let patient = await db.User.findOne({
+                        where: { id: booking.patientId },
+                        attributes: ['firstName', 'lastName', 'email'], raw: true
+                    });
+                    let doctor = await db.User.findOne({
+                        where: { id: doctorId },
+                        attributes: ['firstName', 'lastName'], raw: true
+                    });
+                    let timeTypeData = await db.allCode.findOne({
+                        where: { keyMap: booking.timeType, type: 'TIME' },
+                        attributes: ['value'], raw: true
+                    });
+
+                    const refundNote = refundResult?.success
+                        ? `\nSố tiền ${refundResult.refundAmount.toLocaleString('vi-VN')}đ sẽ được hoàn về tài khoản của bạn trong 5-7 ngày làm việc.`
+                        : '';
+
+                    await sendCancelEmail({
+                        patientEmail: patient?.email,
+                        patientName: patient
+                            ? `${patient.lastName || ''} ${patient.firstName || ''}`.trim()
+                            : 'Bạn',
+                        doctorName: doctor
+                            ? `BS. ${doctor.lastName || ''} ${doctor.firstName || ''}`.trim()
+                            : 'Bác sĩ',
+                        timeValue: timeTypeData?.value || booking.timeType,
+                        dateStr: formatDate(booking.date),
+                        refundNote,
+                        cancelReason: cancelReason || 'Bác sĩ hủy lịch',
+                    });
+                } catch (_e) { }
+            })();
+
+            let message = 'Hủy lịch thành công!';
+            if (refundResult?.success) message += ` Hoàn tiền đang xử lý.`;
+
+            resolve({ errCode: 0, errMessage: message });
         } catch (e) {
             await t.rollback();
             reject(e);
@@ -719,5 +875,6 @@ module.exports = {
     confirmPayment,
     getBookingsByDoctor,
     completeBooking,
-    sendMedicalRecord
+    sendMedicalRecord,
+    doctorCancelBooking,
 };

@@ -38,6 +38,19 @@ let cancelBooking = async (req, res) => {
     }
 }
 
+let doctorCancelBooking = async (req, res) => {
+    try {
+        let result = await bookingService.doctorCancelBooking(
+            req.body.bookingId,
+            req.body.doctorId,
+            req.body.cancelReason
+        );
+        return res.status(200).json(result);
+    } catch (e) {
+        return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
+    }
+};
+
 let getScheduleWithSlots = async (req, res) => {
     try {
         let info = await bookingService.getScheduleWithSlots(req.query.doctorId, req.query.date);

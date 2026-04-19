@@ -4,17 +4,17 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-import Login from './pages/System/Login/Login';
-import Register from './pages/System/Login/Register';
-import Home from './pages/Home';
-import System from './pages/System/System';
-import Doctor from './pages/Doctor/Doctor';
-import DefaultLayout from './layout/DefaultLayout';
-import DoctorDetail from './pages/System/Doctor/DoctorDetail';
-import MyBookings from './pages/MyBookings';
-import ConfirmBooking from './pages/ConfirmBooking';
-import BookingPage from './pages/BookingPage';
-import PaymentResult from './pages/PaymentResult';
+import Login from './features/auth/pages/Login';
+import Register from './features/auth/pages/Register';
+import Home from './features/home/pages/Home';
+import System from './features/admin/pages/System';
+import Doctor from './features/doctor/pages/Doctor';
+import DefaultLayout from './layouts/DefaultLayout';
+import DoctorDetail from './features/admin/pages/DoctorDetail';
+import MyBookings from './features/booking/pages/MyBookings';
+import ConfirmBooking from './features/booking/pages/ConfirmBooking';
+import BookingPage from './features/booking/pages/BookingPage';
+import PaymentResult from './features/booking/pages/PaymentResult';
 
 function App() {
   const { isLoggedIn, userInfo } = useSelector((state) => state.user);

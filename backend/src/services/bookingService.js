@@ -335,10 +335,6 @@ let getBookingsByPatient = (patientId) => {
     });
 };
 
-// ===== THÊM import ở đầu file =====
-import { createRefund } from './vnpayService';
-
-// ===== THAY THẾ hàm cancelBooking cũ =====
 let cancelBooking = (bookingId, patientId) => {
     return new Promise(async (resolve, reject) => {
         const t = await db.sequelize.transaction();

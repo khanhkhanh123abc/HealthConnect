@@ -11,7 +11,8 @@ const vnpay = new VNPay({
 const getVNTime = () => moment().tz('Asia/Ho_Chi_Minh');
 const formatVNPayDate = (momentObj) => momentObj.format('YYYYMMDDHHmmss');
 
-// ===== 1. Tạo URL thanh toán =====
+
+// ================= CREATE PAYMENT =================
 const createPaymentUrl = async (bookingId, amount, ipAddr) => {
     try {
         const txnRef = `HC${bookingId}${Date.now()}`;
@@ -37,152 +38,125 @@ const createPaymentUrl = async (bookingId, amount, ipAddr) => {
     }
 };
 
-// ===== Helper: lưu thông tin giao dịch VNPay vào booking =====
+
+// ================= SAVE TRANSACTION =================
 const saveVNPayTransaction = async (booking, vnpParams) => {
-    booking.vnpTransactionNo = vnpParams['vnp_TransactionNo'] || '';
-    booking.vnpTransactionDate = vnpParams['vnp_PayDate'] || '';
-    // Lưu số tiền thực thanh toán (VNPay trả về đơn vị x100)
-    const vnpAmount = parseInt(vnpParams['vnp_Amount'] || '0');
-    booking.price = Math.round(vnpAmount / 100);
-    await booking.save();
+    try {
+        booking.vnpTransactionNo = vnpParams['vnp_TransactionNo'] || '';
+        booking.vnpTransactionDate = vnpParams['vnp_PayDate'] || '';
+        booking.vnpTxnRef = vnpParams['vnp_TxnRef'] || ''; // ✅ FIX QUAN TRỌNG
+
+        const vnpAmount = parseInt(vnpParams['vnp_Amount'] || '0');
+        booking.price = Math.round(vnpAmount / 100);
+
+        await booking.save();
+
+        console.log(`[VNPay] Saved transaction for booking #${booking.id}`, {
+            txnRef: booking.vnpTxnRef,
+            transactionNo: booking.vnpTransactionNo,
+            payDate: booking.vnpTransactionDate
+        });
+
+    } catch (e) {
+        console.error('[VNPay] save transaction error:', e);
+    }
 };
 
-// ===== 2. Xử lý IPN =====
+
+// ================= HANDLE IPN =================
 const handleVNPayIPN = async (vnpParams) => {
     try {
         const db = require('../models/index').default || require('../models/index');
-        const { sendBankTransferConfirmedEmail } = require('./emailService');
         const verify = vnpay.verifyIpnCall(vnpParams);
 
         if (!verify.isVerified) return { RspCode: '97', Message: 'Invalid checksum' };
         if (!verify.isSuccess) return { RspCode: '00', Message: 'Transaction failed' };
 
         const txnRef = vnpParams['vnp_TxnRef'];
-        const match = txnRef.match(/^HC(\d+)\d{13}$/);
+        const match = txnRef?.match(/^HC(\d+)\d{13}$/);
         if (!match) return { RspCode: '01', Message: 'Order not found' };
 
         const bookingId = parseInt(match[1]);
         const BookingModel = db.Booking || db.Bookings;
-        const booking = await BookingModel.findOne({ where: { id: bookingId }, raw: false });
+
+        const booking = await BookingModel.findOne({
+            where: { id: bookingId },
+            raw: false
+        });
 
         if (!booking) return { RspCode: '01', Message: 'Order not found' };
-        if (booking.statusId === 'S2') return { RspCode: '00', Message: 'Already confirmed' };
 
-        // ✅ Lưu thông tin giao dịch + confirm
+        // tránh xử lý lại
+        if (booking.statusId === 'S2' && booking.vnpTransactionNo) {
+            return { RspCode: '00', Message: 'Already confirmed' };
+        }
+
         booking.statusId = 'S2';
         await saveVNPayTransaction(booking, vnpParams);
 
-        console.log(`[IPN] Booking #${bookingId} → S2, TransNo: ${booking.vnpTransactionNo}`);
-
-        // Gửi email async
-        (async () => {
-            try {
-                const patient = await db.User.findOne({
-                    where: { id: booking.patientId },
-                    attributes: ['firstName', 'lastName', 'email'], raw: true
-                });
-                const doctor = await db.User.findOne({
-                    where: { id: booking.doctorId },
-                    attributes: ['firstName', 'lastName'], raw: true
-                });
-                const timeTypeData = await db.allCode.findOne({
-                    where: { keyMap: booking.timeType, type: 'TIME' },
-                    attributes: ['value'], raw: true
-                });
-                const DAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-                const d = moment(booking.date).tz('Asia/Ho_Chi_Minh');
-                const dateStr = `${DAY_LABELS[d.day()]}, ${d.date()}/${d.month() + 1}/${d.year()}`;
-                await sendBankTransferConfirmedEmail({
-                    patientEmail: patient?.email,
-                    patientName: `${patient?.lastName || ''} ${patient?.firstName || ''}`.trim(),
-                    doctorName: `BS. ${doctor?.lastName || ''} ${doctor?.firstName || ''}`.trim(),
-                    timeValue: timeTypeData?.value || booking.timeType,
-                    dateStr,
-                });
-            } catch (e) {
-                console.error('IPN email error:', e.message);
-            }
-        })();
+        console.log(`[IPN] Booking #${bookingId} confirmed`);
 
         return { RspCode: '00', Message: 'Confirm success' };
+
     } catch (e) {
         console.error('handleVNPayIPN error:', e);
         return { RspCode: '99', Message: 'Unknown error' };
     }
 };
 
-// ===== 3. Return URL =====
+
+// ================= HANDLE RETURN =================
 const handleVNPayReturn = async (vnpParams) => {
     try {
         const verify = vnpay.verifyReturnUrl(vnpParams);
 
-        if (verify.isVerified && verify.isSuccess) {
-            const txnRef = vnpParams['vnp_TxnRef'];
-            const match = txnRef?.match(/^HC(\d+)\d{13}$/);
-
-            if (match) {
-                const bookingId = parseInt(match[1]);
-                const db = require('../models/index').default || require('../models/index');
-                const { sendBankTransferConfirmedEmail } = require('./emailService');
-                const BookingModel = db.Booking || db.Bookings;
-
-                const booking = await BookingModel.findOne({
-                    where: { id: bookingId }, raw: false
-                });
-
-                if (booking && booking.statusId === 'S1') {
-                    // ✅ Lưu thông tin giao dịch + confirm
-                    booking.statusId = 'S2';
-                    await saveVNPayTransaction(booking, vnpParams);
-
-                    console.log(`[Return] Booking #${bookingId} → S2, TransNo: ${booking.vnpTransactionNo}`);
-
-                    // Gửi email (non-blocking)
-                    (async () => {
-                        try {
-                            const patient = await db.User.findOne({
-                                where: { id: booking.patientId },
-                                attributes: ['firstName', 'lastName', 'email'], raw: true
-                            });
-                            const doctor = await db.User.findOne({
-                                where: { id: booking.doctorId },
-                                attributes: ['firstName', 'lastName'], raw: true
-                            });
-                            const timeTypeData = await db.allCode.findOne({
-                                where: { keyMap: booking.timeType, type: 'TIME' },
-                                attributes: ['value'], raw: true
-                            });
-                            const DAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-                            const d = new Date(booking.date);
-                            const dateStr = `${DAY_LABELS[d.getDay()]}, ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
-                            await sendBankTransferConfirmedEmail({
-                                patientEmail: patient?.email,
-                                patientName: `${patient?.lastName || ''} ${patient?.firstName || ''}`.trim(),
-                                doctorName: `BS. ${doctor?.lastName || ''} ${doctor?.firstName || ''}`.trim(),
-                                timeValue: timeTypeData?.value || booking.timeType,
-                                dateStr,
-                            });
-                        } catch (e) {
-                            console.error('Return URL email error:', e.message);
-                        }
-                    })();
-                } else if (booking && booking.statusId === 'S2' && !booking.vnpTransactionNo) {
-                    // IPN đã confirm nhưng chưa lưu TransactionNo → bổ sung
-                    await saveVNPayTransaction(booking, vnpParams);
-                }
-            }
-
-            return { errCode: 0, message: 'Thanh toán thành công!' };
-        } else {
-            return { errCode: 1, message: 'Thanh toán thất bại hoặc bị huỷ!' };
+        if (!verify.isVerified || !verify.isSuccess) {
+            return { errCode: 1, message: 'Thanh toán thất bại!' };
         }
+
+        const txnRef = vnpParams['vnp_TxnRef'];
+        const match = txnRef?.match(/^HC(\d+)\d{13}$/);
+
+        if (!match) {
+            return { errCode: 1, message: 'TxnRef không hợp lệ!' };
+        }
+
+        const bookingId = parseInt(match[1]);
+        const db = require('../models/index').default || require('../models/index');
+        const BookingModel = db.Booking || db.Bookings;
+
+        const booking = await BookingModel.findOne({
+            where: { id: bookingId },
+            raw: false
+        });
+
+        if (!booking) {
+            return { errCode: 1, message: 'Không tìm thấy booking!' };
+        }
+
+        // Nếu chưa confirm → confirm
+        if (booking.statusId === 'S1') {
+            booking.statusId = 'S2';
+            await saveVNPayTransaction(booking, vnpParams);
+            console.log(`[RETURN] Confirm booking #${bookingId}`);
+        }
+
+        // Nếu đã confirm nhưng thiếu data → bổ sung
+        else if (booking.statusId === 'S2' && !booking.vnpTransactionNo) {
+            await saveVNPayTransaction(booking, vnpParams);
+            console.log(`[RETURN] Backfill transaction for #${bookingId}`);
+        }
+
+        return { errCode: 0, message: 'Thanh toán thành công!' };
+
     } catch (e) {
         console.error('handleVNPayReturn error:', e);
         throw e;
     }
 };
 
-// ===== 4. GỌI REFUND =====
+
+// ================= REFUND =================
 const createRefund = async (booking) => {
     try {
         if (!booking.vnpTransactionNo || !booking.vnpTransactionDate || !booking.vnpTxnRef) {
@@ -194,8 +168,8 @@ const createRefund = async (booking) => {
 
         const now = getVNTime();
 
-        const refundResult = await vnpay.refund({
-            vnp_Amount: booking.price * 100, // VNPay yêu cầu x100
+        const result = await vnpay.refund({
+            vnp_Amount: booking.price * 100,
             vnp_TransactionType: '02',
             vnp_TxnRef: booking.vnpTxnRef,
             vnp_TransactionNo: booking.vnpTransactionNo,
@@ -206,29 +180,29 @@ const createRefund = async (booking) => {
             vnp_OrderInfo: `Hoan tien lich kham #${booking.id}`,
         });
 
-        console.log('[Refund] Response:', refundResult);
+        console.log('[Refund] Response:', result);
 
-        if (refundResult?.vnp_ResponseCode === '00' || refundResult?.isSuccess) {
+        if (result?.vnp_ResponseCode === '00' || result?.isSuccess) {
             return {
                 success: true,
-                refundAmount: booking.price,
-                message: 'Hoàn tiền thành công'
+                refundAmount: booking.price
             };
         }
 
         return {
             success: false,
-            message: refundResult?.vnp_Message || 'VNPay refund failed'
+            message: result?.vnp_Message || 'Refund failed'
         };
 
     } catch (e) {
         console.error('[Refund ERROR]', e);
         return {
             success: false,
-            message: e.message || 'Refund exception'
+            message: e.message
         };
     }
 };
+
 
 module.exports = {
     createPaymentUrl,

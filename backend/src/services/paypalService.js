@@ -72,7 +72,8 @@ let handlePaypalReturn = async (token, bookingId) => {
 
         let captureDetail = capture.purchase_units[0].payments.captures[0];
 
-        let booking = await db.Booking.findOne({ where: { id: bookingId }, raw: false });
+        const BookingModel = db.Booking || db.Bookings;
+        let booking = await BookingModel.findOne({ where: { id: bookingId }, raw: false });
         if (!booking) {
             return { errCode: 2, redirectUrl: `${frontendUrl}/payment-result?status=failed` };
         }

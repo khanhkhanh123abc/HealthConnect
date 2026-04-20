@@ -18,31 +18,46 @@ let createPaypalOrder = async (bookingId, amountUsd) => {
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:8080';
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-    let request = new paypal.orders.OrdersCreateRequest();
-    request.prefer('return=representation');
-    request.requestBody({
-        intent: 'CAPTURE',
-        application_context: {
-            brand_name: 'HealthConnect',
-            user_action: 'PAY_NOW',
-            return_url: `${backendUrl}/api/paypal-return?bookingId=${bookingId}`,
-            cancel_url: `${frontendUrl}/payment-result?status=cancelled`,
-        },
-        purchase_units: [{
-            reference_id: bookingId.toString(),
-            description: `HealthConnect - Booking #${bookingId}`,
-            amount: {
-                currency_code: 'USD',
-                value: parseFloat(amountUsd).toFixed(2)
-            }
-        }]
-    });
+    const amount = parseFloat(amountUsd);
+    if (!amount || amount <= 0) {
+        console.error(`[PayPal] Invalid amountUsd=${amountUsd} for bookingId=${bookingId}`);
+        return { errCode: 1, errMessage: 'Số tiền thanh toán không hợp lệ!' };
+    }
 
-    let response = await client.execute(request);
-    let order = response.result;
-    let approvalUrl = order.links.find(l => l.rel === 'approve')?.href;
+    try {
+        let request = new paypal.orders.OrdersCreateRequest();
+        request.prefer('return=representation');
+        request.requestBody({
+            intent: 'CAPTURE',
+            application_context: {
+                brand_name: 'HealthConnect',
+                user_action: 'PAY_NOW',
+                return_url: `${backendUrl}/api/paypal-return?bookingId=${bookingId}`,
+                cancel_url: `${frontendUrl}/payment-result?status=cancelled`,
+            },
+            purchase_units: [{
+                reference_id: bookingId.toString(),
+                description: `HealthConnect - Booking #${bookingId}`,
+                amount: {
+                    currency_code: 'USD',
+                    value: amount.toFixed(2)
+                }
+            }]
+        });
 
-    return { errCode: 0, orderID: order.id, approvalUrl };
+        console.log(`[PayPal] Calling PayPal API — bookingId=${bookingId}, amount=$${amount.toFixed(2)}`);
+        let response = await client.execute(request);
+        let order = response.result;
+        let approvalUrl = order.links.find(l => l.rel === 'approve')?.href;
+
+        console.log(`[PayPal] Order created — orderId=${order.id}, status=${order.status}`);
+        return { errCode: 0, orderID: order.id, approvalUrl };
+    } catch (err) {
+        console.error('[PayPal] client.execute error:', err?.message || err);
+        if (err?.statusCode) console.error('[PayPal] HTTP status:', err.statusCode);
+        if (err?.result) console.error('[PayPal] response body:', JSON.stringify(err.result));
+        throw err;
+    }
 };
 
 // Capture order sau khi user approve trên PayPal và redirect về

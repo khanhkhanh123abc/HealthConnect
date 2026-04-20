@@ -112,7 +112,7 @@ let createBooking = (data) => {
             await schedule.save({ transaction: t });
             await t.commit();
 
-            // Lấy giá tiền từ DB và convert USD → VNĐ
+            // Lấy giá tiền từ DB (value lưu bằng VND) rồi convert sang USD cho PayPal
             let priceAmountVnd = 500000; // fallback
             let priceAmountUsd = 0;
             try {
@@ -135,6 +135,7 @@ let createBooking = (data) => {
             } catch (priceErr) {
                 console.error('Get price error:', priceErr.message);
             }
+            console.log(`[Booking] bookingId=${savedBookingId} priceVnd=${priceAmountVnd} priceUsd=${priceAmountUsd.toFixed(4)}`);
 
             // ✅ FIX 5: chỉ resolve() 1 lần duy nhất, đầy đủ thông tin
             resolve({

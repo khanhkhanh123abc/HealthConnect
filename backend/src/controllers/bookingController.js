@@ -111,9 +111,11 @@ let getPendingBankBookings = async (req, res) => {
 let createPaypalOrder = async (req, res) => {
     try {
         const { bookingId, amountUsd } = req.body;
+        console.log(`[PayPal] createOrder bookingId=${bookingId} amountUsd=${amountUsd}`);
         let info = await paypalService.createPaypalOrder(bookingId, amountUsd);
         return res.status(200).json(info);
     } catch (e) {
+        console.error('[PayPal] createPaypalOrder error:', e?.message || e);
         return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
     }
 };

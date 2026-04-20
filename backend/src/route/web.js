@@ -61,10 +61,9 @@ let initWebRoutes = (app) => {
     router.put('/api/confirm-payment', bookingController.confirmPayment);
     router.get('/api/get-pending-bank-bookings', bookingController.getPendingBankBookings);
     router.put('/api/doctor-cancel-booking', bookingController.doctorCancelBooking);
-    // VNPay
-    router.post('/api/create-vnpay-payment', bookingController.createVNPayPayment);
-    router.get('/api/vnpay-ipn', bookingController.vnpayIPN);      
-    router.get('/api/vnpay-return', bookingController.vnpayReturn);  
+    // PayPal
+    router.post('/api/create-paypal-order', bookingController.createPaypalOrder);
+    router.get('/api/paypal-return', bookingController.paypalReturn);
 
     return app.use('/', router);
 }

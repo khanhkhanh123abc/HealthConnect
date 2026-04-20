@@ -3,7 +3,7 @@ import { Op } from 'sequelize';
 import { v4 as uuidv4 } from 'uuid';
 import { sendBookingConfirmEmail, sendCancelEmail } from './emailService';
 import { convertUsdToVnd } from './currencyService';
-import { createRefund } from './vnpayService';
+import { createRefund } from './paypalService';
 
 const DAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 

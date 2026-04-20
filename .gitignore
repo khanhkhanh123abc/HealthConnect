@@ -28,3 +28,9 @@ yarn-debug.log*
 yarn-error.log*
 
 note
+# Added by code-review-graph
+.code-review-graph/
+
+CLAUDE.md
+.claude
+.mcp.json

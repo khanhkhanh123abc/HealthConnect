@@ -12,6 +12,7 @@
     "dev": "nodemon --exec npx babel-node src/server.js"
   },
   "dependencies": {
+    "@paypal/checkout-server-sdk": "^1.0.3",
     "axios": "^1.15.0",
     "babel": "^5.8.38",
     "bcryptjs": "^3.0.3",

@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import axios from '../../../app/axios';
-import DoctorSchedule from '../../doctor/components/DoctorSchedule';
+import DoctorSchedule from '../../../shared/components/DoctorSchedule';
 import BookingModal from '../components/BookingModal';
 
 // ─── STEPPER HEADER ───────────────────────────────────────────
-const STEPS = ['Chuyên khoa', 'Phòng khám', 'Bác sĩ', 'Đặt lịch'];
+const STEPS = ['Specialty', 'Clinic', 'Doctor', 'Booking'];
 
 const StepHeader = ({ current }) => (
     <div className="flex items-center justify-center mb-8 gap-0">
@@ -18,18 +18,22 @@ const StepHeader = ({ current }) => (
             return (
                 <React.Fragment key={step}>
                     <div className="flex flex-col items-center">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all
-                            ${done ? 'bg-indigo-600 border-indigo-600 text-white'
-                                : active ? 'bg-white border-indigo-600 text-indigo-600'
-                                    : 'bg-white border-gray-300 text-gray-400'}`}>
-                            {done ? '✓' : step}
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-200
+                            ${done ? 'bg-blue-600 border-blue-600 text-white'
+                                : active ? 'bg-white border-blue-600 text-blue-600'
+                                    : 'bg-white border-gray-200 text-gray-400'}`}>
+                            {done ? (
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                            ) : step}
                         </div>
-                        <span className={`text-xs mt-1 font-medium ${active ? 'text-indigo-600' : done ? 'text-indigo-400' : 'text-gray-400'}`}>
+                        <span className={`text-[11px] mt-1.5 font-medium ${active ? 'text-blue-600' : done ? 'text-blue-400' : 'text-gray-400'}`}>
                             {label}
                         </span>
                     </div>
                     {idx < STEPS.length - 1 && (
-                        <div className={`h-0.5 w-16 mx-1 mb-5 transition-all ${done ? 'bg-indigo-600' : 'bg-gray-200'}`} />
+                        <div className={`h-0.5 w-14 mx-1 mb-5 transition-all duration-300 ${done ? 'bg-blue-600' : 'bg-gray-200'}`} />
                     )}
                 </React.Fragment>
             );
@@ -45,7 +49,7 @@ const CardGrid = ({ items, onSelect, selected, type }) => (
             return (
                 <button key={item.id} onClick={() => onSelect(item)}
                     className={`flex flex-col items-center p-4 rounded-xl border-2 transition hover:shadow-md text-left
-                        ${isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white hover:border-indigo-300'}`}>
+                        ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
                     <img
                         src={item.image || 'https://via.placeholder.com/80'}
                         alt={item.name}
@@ -56,7 +60,7 @@ const CardGrid = ({ items, onSelect, selected, type }) => (
                         <p className="text-xs text-gray-400 text-center mt-1 line-clamp-2">{item.address}</p>
                     )}
                     {isSelected && (
-                        <span className="mt-2 text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full">Đã chọn</span>
+                        <span className="mt-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">Selected</span>
                     )}
                 </button>
             );
@@ -72,33 +76,31 @@ const DoctorCard = ({ doctor, onSelect, selected, onViewProfile }) => {
     const position = doctor.positionData?.value || '';
     return (
         <div className={`flex items-center gap-4 p-4 rounded-xl border-2 transition hover:shadow-md w-full
-            ${isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white hover:border-indigo-300'}`}>
-            {/* Ảnh + tên → click chọn bác sĩ */}
+            ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
             <button onClick={() => onSelect(doctor)} className="flex items-center gap-4 flex-1 text-left">
                 <img
                     src={doctor.image || 'https://via.placeholder.com/56'}
                     alt={name}
-                    className="w-14 h-14 rounded-full object-cover border-2 border-indigo-100 flex-shrink-0"
+                    className="w-14 h-14 rounded-full object-cover border-2 border-blue-100 flex-shrink-0"
                 />
                 <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-800">
-                        {position ? `${position}, BS. ${name}` : `BS. ${name}`}
+                        {position ? `${position}, Dr. ${name}` : `Dr. ${name}`}
                     </p>
                     {doctor.description && (
                         <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{doctor.description}</p>
                     )}
                 </div>
                 {isSelected && (
-                    <span className="text-xs bg-indigo-600 text-white px-2 py-1 rounded-full flex-shrink-0">✓</span>
+                    <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full flex-shrink-0">✓</span>
                 )}
             </button>
 
-            {/* Nút xem profile */}
             <button
                 onClick={(e) => { e.stopPropagation(); onViewProfile ? onViewProfile() : navigate(`/doctor-profile/${doctor.id}`); }}
-                className="flex-shrink-0 text-xs text-indigo-600 border border-indigo-300 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition font-medium whitespace-nowrap"
+                className="flex-shrink-0 text-xs text-blue-600 border border-blue-300 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition font-medium whitespace-nowrap"
             >
-                Xem hồ sơ →
+                View profile →
             </button>
         </div>
     );
@@ -124,7 +126,6 @@ const BookingPage = () => {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
 
-    // Selections
     const [specialties, setSpecialties] = useState([]);
     const [clinics, setClinics] = useState([]);
     const [doctors, setDoctors] = useState([]);
@@ -133,13 +134,10 @@ const BookingPage = () => {
     const [selectedClinic, setSelectedClinic] = useState(null);
     const [selectedDoctor, setSelectedDoctor] = useState(null);
 
-    // Booking modal
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [bookingInfo, setBookingInfo] = useState(null);
 
-    // Step 1: Load specialties
     useEffect(() => {
-        // ✅ Restore state nếu user bấm Back từ trang khác
         const saved = sessionStorage.getItem('hc_booking_state');
         if (saved) {
             try {
@@ -160,13 +158,12 @@ const BookingPage = () => {
             try {
                 let res = await axios.get('/api/get-all-specialty');
                 setSpecialties(res?.data?.data || []);
-            } catch (_e) { toast.error('Không thể tải chuyên khoa!'); }
+            } catch (_e) { toast.error('Failed to load specialties.'); }
             finally { setLoading(false); }
         };
         load();
     }, []);
 
-    // Step 2: Load clinics by specialty
     const handleSelectSpecialty = async (spec) => {
         setSelectedSpecialty(spec);
         setSelectedClinic(null);
@@ -177,15 +174,14 @@ const BookingPage = () => {
             const data = res?.data?.data || [];
             setClinics(data);
             if (data.length === 0) {
-                toast.info('Chuyên khoa này chưa có phòng khám nào!');
+                toast.info('No clinics available for this specialty.');
             } else {
                 setStep(2);
             }
-        } catch (_e) { toast.error('Không thể tải phòng khám!'); }
+        } catch (_e) { toast.error('Failed to load clinics.'); }
         finally { setLoading(false); }
     };
 
-    // Step 3: Load doctors by clinic + specialty
     const handleSelectClinic = async (clinic) => {
         setSelectedClinic(clinic);
         setSelectedDoctor(null);
@@ -197,61 +193,58 @@ const BookingPage = () => {
             const data = res?.data?.data || [];
             setDoctors(data);
             if (data.length === 0) {
-                toast.info('Phòng khám này chưa có bác sĩ nào!');
+                toast.info('No doctors available at this clinic.');
             } else {
                 setStep(3);
             }
-        } catch (_e) { toast.error('Không thể tải bác sĩ!'); }
+        } catch (_e) { toast.error('Failed to load doctors.'); }
         finally { setLoading(false); }
     };
 
-    // Step 4: Doctor selected → show schedule
     const handleSelectDoctor = (doctor) => {
         setSelectedDoctor(doctor);
         setStep(4);
     };
 
-    // Slot selected → open modal
     const handleSelectTime = (timeInfo) => {
         if (!isLoggedIn) {
-            toast.warn('Vui lòng đăng nhập để đặt lịch!');
+            toast.warn('Please sign in to book an appointment.');
             navigate('/login');
             return;
         }
         setBookingInfo({
             ...timeInfo,
             doctorId: selectedDoctor.id,
-            doctorName: `BS. ${selectedDoctor.lastName || ''} ${selectedDoctor.firstName || ''}`.trim()
+            doctorName: `Dr. ${selectedDoctor.lastName || ''} ${selectedDoctor.firstName || ''}`.trim()
         });
         setIsModalOpen(true);
     };
 
     const goBack = () => setStep(prev => Math.max(1, prev - 1));
 
-    // Summary bar
     const renderSummary = () => {
         if (step === 1) return null;
         return (
-            <div className="flex items-center gap-2 flex-wrap mb-6 p-3 bg-indigo-50 rounded-xl border border-indigo-100 text-sm">
+            <div className="flex items-center gap-2 flex-wrap mb-6 p-3 bg-blue-50 rounded-xl border border-blue-100 text-sm">
                 {selectedSpecialty && (
-                    <span className="flex items-center gap-1.5 bg-white border border-indigo-200 px-3 py-1 rounded-full text-indigo-700 font-medium">
+                    <span className="flex items-center gap-1.5 bg-white border border-blue-200 px-3 py-1 rounded-full text-blue-700 font-medium">
                         <img src={selectedSpecialty.image} className="w-4 h-4 rounded-full object-cover" alt="" />
                         {selectedSpecialty.name}
                     </span>
                 )}
                 {selectedClinic && (
                     <>
-                        <span className="text-indigo-300">›</span>
-                        <span className="bg-white border border-indigo-200 px-3 py-1 rounded-full text-indigo-700 font-medium">
+                        <span className="text-blue-300">›</span>
+                        <span className="bg-white border border-blue-200 px-3 py-1 rounded-full text-blue-700 font-medium">
                             {selectedClinic.name}
                         </span>
                     </>
                 )}
                 {selectedDoctor && (
                     <>
-                        <span className="text-indigo-300">›</span>
-                        <span className="bg-white border border-indigo-200 px-3 py-1 rounded-full text-indigo-700 font-medium">
-                            BS. {selectedDoctor.lastName} {selectedDoctor.firstName}
+                        <span className="text-blue-300">›</span>
+                        <span className="bg-white border border-blue-200 px-3 py-1 rounded-full text-blue-700 font-medium">
+                            Dr. {selectedDoctor.lastName} {selectedDoctor.firstName}
                         </span>
                     </>
                 )}
@@ -264,8 +257,8 @@ const BookingPage = () => {
             <div className="max-w-4xl mx-auto px-4">
                 {/* Page title */}
                 <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-gray-800">Đặt lịch khám</h1>
-                    <p className="text-gray-500 text-sm mt-1">Chọn theo từng bước để tìm bác sĩ phù hợp</p>
+                    <h1 className="text-2xl font-semibold text-gray-900">Book an Appointment</h1>
+                    <p className="text-gray-500 text-sm mt-1">Select step by step to find the right doctor</p>
                 </div>
 
                 {/* Stepper */}
@@ -277,26 +270,26 @@ const BookingPage = () => {
                 {/* Back button */}
                 {step > 1 && (
                     <button onClick={goBack}
-                        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-indigo-600 mb-4 transition">
-                        ← Quay lại
+                        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 mb-4 transition">
+                        ← Back
                     </button>
                 )}
 
-                {/* ── STEP 1: Chuyên khoa ── */}
+                {/* ── STEP 1: Specialty ── */}
                 {step === 1 && (
                     <div>
-                        <h2 className="text-lg font-semibold text-gray-700 mb-4">Chọn chuyên khoa</h2>
+                        <h2 className="text-lg font-semibold text-gray-700 mb-4">Select Specialty</h2>
                         {loading ? <SkeletonGrid /> : (
                             <CardGrid items={specialties} selected={selectedSpecialty} onSelect={handleSelectSpecialty} type="specialty" />
                         )}
                     </div>
                 )}
 
-                {/* ── STEP 2: Phòng khám ── */}
+                {/* ── STEP 2: Clinic ── */}
                 {step === 2 && (
                     <div>
                         <h2 className="text-lg font-semibold text-gray-700 mb-4">
-                            Chọn phòng khám — <span className="text-indigo-600">{selectedSpecialty?.name}</span>
+                            Select Clinic — <span className="text-blue-600">{selectedSpecialty?.name}</span>
                         </h2>
                         {loading ? <SkeletonGrid count={4} /> : (
                             <CardGrid items={clinics} selected={selectedClinic} onSelect={handleSelectClinic} type="clinic" />
@@ -304,11 +297,11 @@ const BookingPage = () => {
                     </div>
                 )}
 
-                {/* ── STEP 3: Bác sĩ ── */}
+                {/* ── STEP 3: Doctor ── */}
                 {step === 3 && (
                     <div>
                         <h2 className="text-lg font-semibold text-gray-700 mb-4">
-                            Chọn bác sĩ — <span className="text-indigo-600">{selectedClinic?.name}</span>
+                            Select Doctor — <span className="text-blue-600">{selectedClinic?.name}</span>
                         </h2>
                         {loading ? (
                             <div className="space-y-3">
@@ -329,7 +322,6 @@ const BookingPage = () => {
                                         selected={selectedDoctor}
                                         onSelect={handleSelectDoctor}
                                         onViewProfile={() => {
-                                            // ✅ Lưu toàn bộ state trước khi rời trang
                                             sessionStorage.setItem('hc_booking_state', JSON.stringify({
                                                 step: 3,
                                                 selectedSpecialty,
@@ -355,19 +347,19 @@ const BookingPage = () => {
                             <img
                                 src={selectedDoctor.image || 'https://via.placeholder.com/56'}
                                 alt=""
-                                className="w-14 h-14 rounded-full object-cover border-2 border-indigo-100"
+                                className="w-14 h-14 rounded-full object-cover border-2 border-blue-100"
                             />
                             <div>
-                                <p className="font-bold text-gray-800 text-lg">
+                                <p className="font-semibold text-gray-900 text-base">
                                     {selectedDoctor.positionData?.value && `${selectedDoctor.positionData.value}, `}
-                                    BS. {selectedDoctor.lastName} {selectedDoctor.firstName}
+                                    Dr. {selectedDoctor.lastName} {selectedDoctor.firstName}
                                 </p>
-                                <p className="text-sm text-indigo-600">{selectedClinic?.name}</p>
+                                <p className="text-sm text-blue-600">{selectedClinic?.name}</p>
                                 <p className="text-xs text-gray-400">{selectedClinic?.address}</p>
                             </div>
                         </div>
 
-                        <h3 className="font-semibold text-gray-700 mb-2">Chọn ngày và khung giờ</h3>
+                        <h3 className="font-semibold text-gray-700 mb-2">Select Date and Time Slot</h3>
                         <DoctorSchedule
                             doctorId={selectedDoctor.id}
                             onSelectTime={handleSelectTime}

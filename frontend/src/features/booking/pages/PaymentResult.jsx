@@ -1,56 +1,55 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 
 const PaymentResult = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    const status = searchParams.get('status'); // 'success' | 'failed' | 'error'
+    const status = searchParams.get('status');
 
     const config = {
         success: {
-            icon: '✅',
-            title: 'Thanh toán thành công!',
-            desc: 'Lịch khám của bạn đã được xác nhận. Vui lòng kiểm tra email để xem chi tiết.',
-            btnText: 'Xem lịch hẹn của tôi',
+            Icon: CheckCircle,
+            iconColor: 'text-emerald-500',
+            iconBg: 'bg-emerald-50',
+            title: 'Payment Successful',
+            desc: 'Your appointment has been confirmed. Please check your email for details.',
+            btnText: 'View my appointments',
             btnAction: () => navigate('/my-bookings'),
-            color: 'text-green-600',
-            bg: 'bg-green-50',
-            border: 'border-green-200',
         },
         failed: {
-            icon: '❌',
-            title: 'Thanh toán thất bại',
-            desc: 'Giao dịch không thành công hoặc bị huỷ. Lịch khám chưa được xác nhận.',
-            btnText: 'Thử lại',
+            Icon: XCircle,
+            iconColor: 'text-red-500',
+            iconBg: 'bg-red-50',
+            title: 'Payment Failed',
+            desc: 'The transaction was unsuccessful or cancelled. Your appointment has not been confirmed.',
+            btnText: 'Try again',
             btnAction: () => navigate('/booking'),
-            color: 'text-red-600',
-            bg: 'bg-red-50',
-            border: 'border-red-200',
         },
         error: {
-            icon: '⚠️',
-            title: 'Có lỗi xảy ra',
-            desc: 'Hệ thống gặp sự cố. Vui lòng liên hệ hỗ trợ nếu tiền đã bị trừ.',
-            btnText: 'Về trang chủ',
+            Icon: AlertTriangle,
+            iconColor: 'text-amber-500',
+            iconBg: 'bg-amber-50',
+            title: 'Something went wrong',
+            desc: 'The system encountered an error. Please contact support if your payment was charged.',
+            btnText: 'Go home',
             btnAction: () => navigate('/home'),
-            color: 'text-amber-600',
-            bg: 'bg-amber-50',
-            border: 'border-amber-200',
         },
     };
 
     const c = config[status] || config.error;
+    const { Icon } = c;
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-            <div className={`bg-white rounded-2xl shadow-lg border ${c.border} p-10 max-w-md w-full text-center`}>
-                <div className="text-6xl mb-4">{c.icon}</div>
-                <h1 className={`text-2xl font-bold mb-3 ${c.color}`}>{c.title}</h1>
-                <p className="text-gray-500 text-sm mb-8 leading-relaxed">{c.desc}</p>
-                <button
-                    onClick={c.btnAction}
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition"
-                >
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+            <div className="bg-white rounded-2xl border border-gray-200/60 p-10 max-w-md w-full text-center">
+                <div className={`w-16 h-16 ${c.iconBg} rounded-2xl flex items-center justify-center mx-auto mb-5`}>
+                    <Icon className={`w-8 h-8 ${c.iconColor}`} />
+                </div>
+                <h1 className="text-xl font-semibold text-gray-900 mb-2">{c.title}</h1>
+                <p className="text-gray-500 text-sm mb-8 leading-relaxed max-w-xs mx-auto">{c.desc}</p>
+                <button onClick={c.btnAction}
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl active:scale-[0.98] transition-all duration-200 text-sm">
                     {c.btnText}
                 </button>
             </div>

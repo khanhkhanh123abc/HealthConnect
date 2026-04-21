@@ -4,14 +4,14 @@ import axios from '../../../app/axios';
 import { toast } from 'react-toastify';
 
 // ─── Constants ────────────────────────────────────────────────
-const DAY_LABELS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-const DAY_FULL = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const STATUS_CFG = {
-    S1: { label: 'Chờ xác nhận', color: 'bg-amber-100 text-amber-800 border-amber-300' },
-    S2: { label: 'Đã xác nhận', color: 'bg-blue-100 text-blue-800 border-blue-300' },
-    S3: { label: 'Hoàn thành', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
-    S4: { label: 'Đã hủy', color: 'bg-red-100 text-red-800 border-red-300' },
+    S1: { label: 'Pending',   color: 'bg-amber-100 text-amber-800 border-amber-300' },
+    S2: { label: 'Confirmed', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+    S3: { label: 'Completed', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+    S4: { label: 'Cancelled', color: 'bg-red-100 text-red-800 border-red-300' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -46,10 +46,16 @@ const StatusBadge = ({ statusId }) => {
     );
 };
 
-const PatientModal = ({ booking, onClose, onComplete, onSendRecord }) => {
+const PatientModal = ({ booking, onClose, onComplete, onSendPrescription }) => {
     const [tab, setTab] = useState('info');
-    const [recordContent, setRecordContent] = useState('');
+    const [diagnosis, setDiagnosis] = useState('');
+    const [medications, setMedications] = useState([{ name: '', dosage: '' }]);
+    const [instructions, setInstructions] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const addMed = () => setMedications(prev => [...prev, { name: '', dosage: '' }]);
+    const updateMed = (i, field, val) => setMedications(prev => prev.map((m, idx) => idx === i ? { ...m, [field]: val } : m));
+    const removeMed = (i) => setMedications(prev => prev.filter((_, idx) => idx !== i));
 
     if (!booking) return null;
 
@@ -62,18 +68,22 @@ const PatientModal = ({ booking, onClose, onComplete, onSendRecord }) => {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-4 flex items-center justify-between">
+                <div className="px-6 pt-6 pb-4 flex items-start justify-between">
                     <div>
-                        <h3 className="text-white font-bold text-lg">{booking.patientName}</h3>
-                        <p className="text-indigo-200 text-sm mt-0.5">{formatDateFull(booking.date)} · {booking.timeValue}</p>
+                        <h3 className="text-xl font-semibold text-gray-900">{booking.patientName}</h3>
+                        <p className="text-sm text-gray-500 mt-0.5">{formatDateFull(booking.date)} · {booking.timeValue}</p>
                     </div>
-                    <button onClick={onClose} className="text-white/70 hover:text-white text-2xl">×</button>
+                    <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
                 </div>
 
                 <div className="flex border-b border-gray-100">
-                    {[['info', '👤 Thông tin'], ['record', '📋 Hồ sơ / Đơn thuốc']].map(([key, label]) => (
+                    {[['info', 'Information'], ['record', 'Records / Prescription']].map(([key, label]) => (
                         <button key={key} onClick={() => setTab(key)}
-                            className={`flex-1 py-3 text-sm font-medium transition-colors ${tab === key ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>
+                            className={`flex-1 py-3 text-sm font-medium transition-colors ${tab === key ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
                             {label}
                         </button>
                     ))}
@@ -83,7 +93,7 @@ const PatientModal = ({ booking, onClose, onComplete, onSendRecord }) => {
                     {tab === 'info' ? (
                         <div className="space-y-3">
                             <div className="flex items-center gap-4 mb-4">
-                                <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center text-2xl text-indigo-500 overflow-hidden">
+                                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-2xl text-blue-500 overflow-hidden">
                                     {booking.patientImage ? <img src={booking.patientImage} alt="" className="w-full h-full object-cover" /> : (booking.patientName?.[0] || '?')}
                                 </div>
                                 <div>
@@ -91,7 +101,7 @@ const PatientModal = ({ booking, onClose, onComplete, onSendRecord }) => {
                                     <StatusBadge statusId={booking.statusId} />
                                 </div>
                             </div>
-                            {[['📧 Email', booking.patientEmail], ['📞 SĐT', booking.patientPhone], ['🏠 Địa chỉ', booking.patientAddress], ['💬 Lý do khám', booking.reason]].map(([label, value]) => value && (
+                            {[['Email', booking.patientEmail], ['Phone', booking.patientPhone], ['Address', booking.patientAddress], ['Reason', booking.reason]].map(([label, value]) => value && (
                                 <div key={label} className="flex items-start gap-3 bg-gray-50 rounded-lg px-4 py-2.5">
                                     <span className="text-sm text-gray-500 w-28 shrink-0">{label}</span>
                                     <span className="text-sm text-gray-800 font-medium">{value}</span>
@@ -100,18 +110,50 @@ const PatientModal = ({ booking, onClose, onComplete, onSendRecord }) => {
                             {booking.statusId === 'S2' && (
                                 <button onClick={() => handleAction(onComplete, booking.id)} disabled={loading}
                                     className="mt-4 w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition disabled:opacity-60">
-                                    {loading ? 'Đang xử lý...' : '✅ Đánh dấu hoàn thành'}
+                                    {loading ? 'Processing...' : 'Mark as Completed'}
                                 </button>
                             )}
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            <textarea value={recordContent} onChange={e => setRecordContent(e.target.value)} rows={8}
-                                placeholder="Nhập nội dung hồ sơ/đơn thuốc..."
-                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm font-mono focus:ring-2 focus:ring-indigo-400 outline-none resize-none" />
-                            <button onClick={() => handleAction(onSendRecord, booking.id, recordContent)} disabled={loading}
-                                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition disabled:opacity-60">
-                                {loading ? 'Đang gửi...' : '📤 Gửi hồ sơ qua Email'}
+                            <div>
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Diagnosis</label>
+                                <input value={diagnosis} onChange={e => setDiagnosis(e.target.value)}
+                                    placeholder="Acute pharyngitis, Hypertension..."
+                                    className="mt-1.5 w-full bg-gray-100 border-0 rounded-xl px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/30 transition-all" />
+                            </div>
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Prescribed Medications</label>
+                                    <button type="button" onClick={addMed} className="text-xs text-blue-600 font-medium hover:text-blue-700 transition-colors">+ Add medication</button>
+                                </div>
+                                <div className="space-y-2">
+                                    {medications.map((med, i) => (
+                                        <div key={i} className="flex gap-2 items-center">
+                                            <input value={med.name} onChange={e => updateMed(i, 'name', e.target.value)}
+                                                placeholder="Medication name"
+                                                className="flex-1 bg-gray-100 border-0 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/30 transition-all" />
+                                            <input value={med.dosage} onChange={e => updateMed(i, 'dosage', e.target.value)}
+                                                placeholder="Dosage"
+                                                className="w-28 bg-gray-100 border-0 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/30 transition-all" />
+                                            {medications.length > 1 && (
+                                                <button type="button" onClick={() => removeMed(i)} className="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors text-lg font-medium leading-none">×</button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Instructions</label>
+                                <textarea value={instructions} onChange={e => setInstructions(e.target.value)} rows={3}
+                                    placeholder="Take medication after meals, rest well..."
+                                    className="mt-1.5 w-full bg-gray-100 border-0 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/30 transition-all resize-none" />
+                            </div>
+                            <button
+                                onClick={() => handleAction(onSendPrescription, booking.id, { diagnosis, medications, instructions })}
+                                disabled={loading || !diagnosis.trim()}
+                                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-all active:scale-[0.98] disabled:opacity-60 shadow-sm">
+                                {loading ? 'Sending...' : 'Send Prescription via Email'}
                             </button>
                         </div>
                     )}
@@ -148,7 +190,7 @@ const ManagePatient = () => {
             const res = await axios.get(`/api/get-bookings-by-doctor?doctorId=${doctorId}&weekStart=${weekStart.getTime()}`);
             if (res?.data?.errCode === 0) setBookings(res.data.data || []);
         } catch (e) {
-            toast.error('Lỗi kết nối máy chủ!');
+            toast.error('Connection error.');
         } finally {
             setIsLoading(false);
         }
@@ -164,15 +206,27 @@ const ManagePatient = () => {
         S3: bookings.filter(b => b.statusId === 'S3').length,
     }), [bookings]);
 
+    const handleSendPrescription = async (bookingId, { diagnosis, medications, instructions }) => {
+        try {
+            const res = await axios.post('/api/send-prescription', { bookingId, doctorId, diagnosis, medications, instructions });
+            if (res?.data?.errCode === 0) {
+                toast.success('Prescription sent via email.');
+                setSelectedBooking(null);
+            } else {
+                toast.error(res?.data?.errMessage || 'Failed to send.');
+            }
+        } catch { toast.error('Connection error.'); }
+    };
+
     const handleComplete = async (bookingId) => {
         try {
             const res = await axios.put('/api/complete-booking', { bookingId, doctorId });
             if (res?.data?.errCode === 0) {
-                toast.success('Đã hoàn thành!');
+                toast.success('Marked as completed.');
                 fetchBookings();
                 setSelectedBooking(null);
             }
-        } catch { toast.error('Lỗi kết nối!'); }
+        } catch { toast.error('Connection error.'); }
     };
 
     const handleDoctorCancel = async () => {
@@ -182,17 +236,17 @@ const ManagePatient = () => {
             const res = await axios.put('/api/doctor-cancel-booking', {
                 bookingId: cancelModal.id,
                 doctorId,
-                cancelReason: cancelReason.trim() || 'Bác sĩ hủy lịch'
+                cancelReason: cancelReason.trim() || 'Cancelled by doctor'
             });
             if (res?.data?.errCode === 0) {
-                toast.success('Đã hủy lịch!');
+                toast.success('Appointment cancelled.');
                 setCancelModal(null);
                 setCancelReason('');
                 fetchBookings();
             } else {
-                toast.error(res?.data?.errMessage || 'Hủy thất bại!');
+                toast.error(res?.data?.errMessage || 'Cancellation failed.');
             }
-        } catch { toast.error('Lỗi kết nối!'); }
+        } catch { toast.error('Connection error.'); }
         finally { setCancelling(false); }
     };
 
@@ -202,20 +256,20 @@ const ManagePatient = () => {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Quản lý Bệnh nhân</h1>
-                        <p className="text-sm text-gray-500">Tuần từ {formatDateShort(weekDays[0])} đến {formatDateShort(weekDays[6])}</p>
+                        <h1 className="text-2xl font-semibold text-gray-900">Patient Management</h1>
+                        <p className="text-sm text-gray-500">Week of {formatDateShort(weekDays[0])} – {formatDateShort(weekDays[6])}</p>
                     </div>
                     <button onClick={() => { setWeekStart(getMonday()); setSelectedDay(new Date()); }}
-                        className="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition">
-                        Hôm nay
+                        className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition">
+                        Today
                     </button>
                 </div>
 
                 {/* Week Navigator */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+                <div className="bg-white rounded-2xl border border-gray-200/60 p-4 mb-6">
                     <div className="flex items-center justify-between mb-4">
                         <button onClick={() => setWeekStart(prev => new Date(prev.setDate(prev.getDate() - 7)))} className="p-2 hover:bg-gray-100 rounded-full">‹</button>
-                        <span className="text-sm font-bold text-gray-700">Tháng {selectedDay.getMonth() + 1} / {selectedDay.getFullYear()}</span>
+                        <span className="text-sm font-semibold text-gray-700">{selectedDay.toLocaleString('en', { month: 'long' })} {selectedDay.getFullYear()}</span>
                         <button onClick={() => setWeekStart(prev => new Date(prev.setDate(prev.getDate() + 7)))} className="p-2 hover:bg-gray-100 rounded-full">›</button>
                     </div>
                     <div className="grid grid-cols-7 gap-2">
@@ -224,10 +278,10 @@ const ManagePatient = () => {
                             const count = bookings.filter(b => isSameDay(b.date, day)).length;
                             return (
                                 <button key={i} onClick={() => setSelectedDay(day)}
-                                    className={`flex flex-col items-center py-3 rounded-xl transition ${isActive ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-gray-50 text-gray-600'}`}>
-                                    <span className="text-[10px] font-bold uppercase opacity-70">{DAY_LABELS[day.getDay()]}</span>
-                                    <span className="text-lg font-black">{day.getDate()}</span>
-                                    {count > 0 && <span className={`w-1.5 h-1.5 rounded-full mt-1 ${isActive ? 'bg-white' : 'bg-indigo-500'}`} />}
+                                    className={`flex flex-col items-center py-3 rounded-xl transition ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-gray-50 text-gray-600'}`}>
+                                    <span className="text-[10px] font-medium uppercase opacity-70">{DAY_LABELS[day.getDay()]}</span>
+                                    <span className="text-lg font-semibold">{day.getDate()}</span>
+                                    {count > 0 && <span className={`w-1.5 h-1.5 rounded-full mt-1 ${isActive ? 'bg-white' : 'bg-blue-500'}`} />}
                                 </button>
                             );
                         })}
@@ -235,40 +289,39 @@ const ManagePatient = () => {
                 </div>
 
                 {/* Patient List */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                        <h2 className="font-bold text-gray-800">{formatDateFull(selectedDay)}</h2>
-                        <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">{bookingsOfDay.length} LỊCH HẸN</span>
+                <div className="bg-white rounded-2xl border border-gray-200/60 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                        <h2 className="text-sm font-semibold text-gray-900">{formatDateFull(selectedDay)}</h2>
+                        <span className="text-xs font-medium text-blue-600 bg-blue-50 ring-1 ring-blue-200 px-2.5 py-1 rounded-full">{bookingsOfDay.length} appointment{bookingsOfDay.length !== 1 ? 's' : ''}</span>
                     </div>
 
                     {isLoading ? (
-                        <div className="p-20 text-center"><div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto" /></div>
+                        <div className="p-20 text-center"><div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto" /></div>
                     ) : bookingsOfDay.length === 0 ? (
-                        <div className="py-20 text-center text-gray-400">
-                            <p className="text-4xl mb-2">🍃</p>
-                            <p>Không có lịch hẹn nào cho ngày này</p>
+                        <div className="py-16 text-center text-gray-400">
+                            <p className="text-sm">No appointments for this day</p>
                         </div>
                     ) : (
                         <div className="divide-y divide-gray-50">
                             {bookingsOfDay.map((booking) => (
                                 <div key={booking.id} onClick={() => setSelectedBooking(booking)}
-                                    className="flex items-center gap-4 px-6 py-5 hover:bg-indigo-50/30 transition cursor-pointer group">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shrink-0 shadow-sm">
+                                    className="flex items-center gap-4 px-6 py-5 hover:bg-blue-50/30 transition cursor-pointer group">
+                                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm shrink-0 overflow-hidden">
                                         {booking.patientImage ? <img src={booking.patientImage} className="w-full h-full rounded-full object-cover" alt=""/> : booking.patientName?.[0]}
                                     </div>
                                     <div className="flex-1">
-                                        <p className="font-bold text-gray-900 group-hover:text-indigo-600 transition">{booking.patientName}</p>
+                                        <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition">{booking.patientName}</p>
                                         <div className="flex items-center gap-2 mt-0.5">
-                                            <span className="text-xs font-bold text-indigo-500">{booking.timeValue}</span>
+                                            <span className="text-xs font-medium text-blue-600">{booking.timeValue}</span>
                                             <span className="text-gray-300">•</span>
                                             <StatusBadge statusId={booking.statusId} />
                                         </div>
                                     </div>
                                     <div className="flex gap-2" onClick={e => e.stopPropagation()}>
                                         {['S1', 'S2'].includes(booking.statusId) && (
-                                            <button onClick={() => setCancelModal(booking)} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition">❌</button>
+                                            <button onClick={() => setCancelModal(booking)} className="text-xs font-medium text-red-500 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors">Cancel</button>
                                         )}
-                                        <button onClick={() => setSelectedBooking(booking)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition">👁</button>
+                                        <button onClick={() => setSelectedBooking(booking)} className="text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors">View</button>
                                     </div>
                                 </div>
                             ))}
@@ -278,10 +331,10 @@ const ManagePatient = () => {
 
                 {/* Stats */}
                 <div className="mt-8 grid grid-cols-3 gap-4">
-                    {[['Chờ khám', stats.S1, 'bg-amber-50 text-amber-600'], ['Đã xác nhận', stats.S2, 'bg-blue-50 text-blue-600'], ['Hoàn thành', stats.S3, 'bg-emerald-50 text-emerald-600']].map(([label, val, style]) => (
+                    {[['Pending', stats.S1, 'bg-amber-50 text-amber-600'], ['Confirmed', stats.S2, 'bg-blue-50 text-blue-600'], ['Completed', stats.S3, 'bg-emerald-50 text-emerald-600']].map(([label, val, style]) => (
                         <div key={label} className={`${style} p-4 rounded-2xl border border-current border-opacity-10 text-center shadow-sm`}>
-                            <p className="text-2xl font-black">{val}</p>
-                            <p className="text-[10px] font-bold uppercase tracking-wider mt-1 opacity-80">{label}</p>
+                            <p className="text-2xl font-semibold">{val}</p>
+                            <p className="text-[10px] font-medium uppercase tracking-wider mt-1 opacity-70">{label}</p>
                         </div>
                     ))}
                 </div>
@@ -289,34 +342,36 @@ const ManagePatient = () => {
 
             {/* Modals */}
             {selectedBooking && (
-                <PatientModal 
-                    booking={selectedBooking} 
-                    onClose={() => setSelectedBooking(null)} 
-                    onComplete={handleComplete} 
-                    onSendRecord={handleSendRecord} 
+                <PatientModal
+                    booking={selectedBooking}
+                    onClose={() => setSelectedBooking(null)}
+                    onComplete={handleComplete}
+                    onSendPrescription={handleSendPrescription}
                 />
             )}
 
             {cancelModal && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-                        <div className="bg-red-600 p-6 text-white">
-                            <h3 className="font-bold text-xl">Xác nhận hủy lịch</h3>
-                            <p className="text-red-100 text-sm mt-1">{cancelModal.patientName} - {cancelModal.timeValue}</p>
+                    <div className="bg-white rounded-2xl border border-gray-200/60 w-full max-w-md overflow-hidden shadow-xl">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                            <div>
+                                <h3 className="text-base font-semibold text-gray-900">Confirm Cancellation</h3>
+                                <p className="text-xs text-gray-400 mt-0.5">{cancelModal.patientName} · {cancelModal.timeValue}</p>
+                            </div>
                         </div>
                         <div className="p-6">
                             {cancelModal.statusId === 'S2' && cancelModal.paymentMethod === 'BANK' && (
-                                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg font-medium">
-                                    ⚠️ Lịch đã thanh toán. Hệ thống sẽ hoàn tiền tự động cho bệnh nhân.
+                                <div className="mb-4 p-3 bg-amber-50 ring-1 ring-amber-200 text-amber-800 text-xs rounded-xl font-medium">
+                                    This appointment was paid online. The system will automatically refund the patient.
                                 </div>
                             )}
-                            <label className="text-xs font-bold text-gray-500 uppercase">Lý do hủy</label>
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Reason for cancellation</label>
                             <textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)}
-                                className="w-full border border-gray-200 rounded-xl p-3 mt-2 text-sm focus:ring-2 focus:ring-red-500 outline-none" rows={3} placeholder="Bác sĩ bận việc đột xuất..." />
-                            <div className="flex gap-3 mt-6">
-                                <button onClick={() => {setCancelModal(null); setCancelReason('');}} className="flex-1 py-3 text-sm font-bold text-gray-500 hover:bg-gray-50 rounded-xl transition">Đóng</button>
-                                <button onClick={handleDoctorCancel} disabled={cancelling} className="flex-1 py-3 bg-red-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-red-200 transition disabled:opacity-50">
-                                    {cancelling ? 'Đang xử lý...' : 'Xác nhận hủy'}
+                                className="w-full bg-gray-100 border-0 rounded-xl px-4 py-3 mt-1.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/30 transition-all resize-none" rows={3} placeholder="Doctor has an urgent matter..." />
+                            <div className="flex gap-3 mt-5">
+                                <button onClick={() => {setCancelModal(null); setCancelReason('');}} className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">Close</button>
+                                <button onClick={handleDoctorCancel} disabled={cancelling} className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-medium active:scale-[0.98] transition-all shadow-sm disabled:opacity-50">
+                                    {cancelling ? 'Processing...' : 'Confirm Cancel'}
                                 </button>
                             </div>
                         </div>

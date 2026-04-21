@@ -5,6 +5,8 @@ import doctorController from '../controllers/doctorController.js';
 import specialtyController from '../controllers/specialtyController.js';
 import clinicController from '../controllers/clinicController.js';
 import bookingController from '../controllers/bookingController.js';
+import searchController from '../controllers/searchController.js';
+import statsController from '../controllers/statsController.js';
 
 let router = express.Router();
 
@@ -64,6 +66,13 @@ let initWebRoutes = (app) => {
     // PayPal
     router.post('/api/create-paypal-order', bookingController.createPaypalOrder);
     router.get('/api/paypal-return', bookingController.paypalReturn);
+    // Prescription
+    router.post('/api/send-prescription', bookingController.sendPrescription);
+    // Search
+    router.get('/api/global-search', searchController.globalSearch);
+    // Stats / Dashboard
+    router.get('/api/admin-stats', statsController.getAdminStats);
+    router.get('/api/doctor-stats', statsController.getDoctorStats);
 
     return app.use('/', router);
 }

@@ -2,7 +2,6 @@ import db from '../models/index';
 import { Op } from 'sequelize';
 import { v4 as uuidv4 } from 'uuid';
 import { sendBookingConfirmEmail, sendCancelEmail } from './emailService';
-import { convertUsdToVnd } from './currencyService';
 import { createRefund } from './paypalService';
 
 const DAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
@@ -112,8 +111,7 @@ let createBooking = (data) => {
             await schedule.save({ transaction: t });
             await t.commit();
 
-            // Lấy giá tiền từ DB (value lưu bằng VND) rồi convert sang USD cho PayPal
-            let priceAmountVnd = 500000; // fallback
+            // Lấy giá USD từ DB
             let priceAmountUsd = 0;
             try {
                 let doctorInfo = await db.Doctor_Info.findOne({
@@ -129,13 +127,19 @@ let createBooking = (data) => {
                     });
                     if (priceCode?.value) {
                         priceAmountUsd = parseFloat(priceCode.value);
-                        priceAmountVnd = await convertUsdToVnd(priceAmountUsd);
                     }
                 }
             } catch (priceErr) {
                 console.error('Get price error:', priceErr.message);
             }
-            console.log(`[Booking] bookingId=${savedBookingId} priceVnd=${priceAmountVnd} priceUsd=${priceAmountUsd.toFixed(4)}`);
+            console.log(`[Booking] bookingId=${savedBookingId} priceUsd=${priceAmountUsd}`);
+
+            // Lưu price (USD) vào DB
+            const BookingModel2 = db.Booking || db.Bookings;
+            await BookingModel2.update(
+                { price: priceAmountUsd },
+                { where: { id: savedBookingId } }
+            );
 
             // ✅ FIX 5: chỉ resolve() 1 lần duy nhất, đầy đủ thông tin
             resolve({
@@ -144,7 +148,6 @@ let createBooking = (data) => {
                 remainingSlots: schedule.maxNumber - schedule.currentNumber,
                 token: confirmToken,
                 bookingId: savedBookingId,
-                amount: priceAmountVnd,
                 amountUsd: priceAmountUsd,
             });
 
@@ -894,6 +897,40 @@ let getPendingBankBookings = () => {
     });
 };
 
+let sendPrescription = async (bookingId, doctorId, { diagnosis, medications, instructions }) => {
+    if (!bookingId || !doctorId || !diagnosis) return { errCode: 1, errMessage: 'Missing parameters' };
+
+    const BookingModel = db.Booking || db.Bookings;
+    let booking = await BookingModel.findOne({ where: { id: bookingId, doctorId }, raw: true });
+    if (!booking) return { errCode: 2, errMessage: 'Không tìm thấy lịch hẹn!' };
+
+    let [patient, doctor] = await Promise.all([
+        db.User.findOne({ where: { id: booking.patientId }, attributes: ['firstName', 'lastName', 'email'], raw: true }),
+        db.User.findOne({ where: { id: doctorId }, attributes: ['firstName', 'lastName'], raw: true }),
+    ]);
+
+    if (!patient?.email) return { errCode: 3, errMessage: 'Không tìm thấy email bệnh nhân!' };
+
+    const patientName = `${patient.lastName || ''} ${patient.firstName || ''}`.trim();
+    const doctorName = `BS. ${doctor?.lastName || ''} ${doctor?.firstName || ''}`.trim();
+
+    const { generatePrescriptionPdf } = require('./prescriptionService');
+    const { sendPrescriptionEmail } = require('./emailService');
+
+    const pdfBuffer = await generatePrescriptionPdf({
+        doctorName,
+        patientName,
+        diagnosis,
+        medications,
+        instructions,
+        date: new Date().toLocaleDateString('vi-VN'),
+    });
+
+    await sendPrescriptionEmail({ patientEmail: patient.email, patientName, doctorName, pdfBuffer });
+
+    return { errCode: 0, errMessage: 'Đã gửi đơn thuốc qua email!' };
+};
+
 module.exports = {
     createBooking,
     confirmBookingByToken,
@@ -906,4 +943,5 @@ module.exports = {
     completeBooking,
     sendMedicalRecord,
     doctorCancelBooking,
+    sendPrescription,
 };

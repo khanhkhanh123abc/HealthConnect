@@ -3,6 +3,7 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { processLogout } from '../../../features/auth/store/userSlice';
 import { adminMenu, doctorMenu } from './menuConfig';
+import { LogOut, Calendar, ChevronDown, Activity } from 'lucide-react';
 
 const Header = () => {
     const navigate = useNavigate();
@@ -20,116 +21,96 @@ const Header = () => {
     const roleId = userInfo?.roleId;
     const displayName = `${userInfo?.lastName || ''} ${userInfo?.firstName || ''}`.trim() || 'User';
     const initial = (userInfo?.firstName?.[0] || userInfo?.lastName?.[0] || 'U').toUpperCase();
-
-    // Lấy menu theo role
     const roleMenu = roleId === 'R1' ? adminMenu : roleId === 'R2' ? doctorMenu : [];
 
+    const navLinkClass = (path) =>
+        `px-3 py-1.5 text-sm font-medium rounded-lg transition-colors duration-200 ${
+            location.pathname === path || location.pathname.startsWith(path + '/')
+                ? 'text-blue-600'
+                : 'text-gray-600 hover:text-gray-900'
+        }`;
+
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm h-16">
-            <div className="container mx-auto px-4 h-full flex items-center justify-between">
+        <header className="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-200/50">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
 
                 {/* Logo */}
-                <Link to="/home" className="flex items-center gap-2 flex-shrink-0">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-                        <span className="text-white font-bold text-sm">H</span>
+                <Link to="/home" className="flex items-center gap-2.5 flex-shrink-0">
+                    <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center">
+                        <Activity className="w-4 h-4 text-white" />
                     </div>
-                    <span className="font-bold text-indigo-700 text-lg hidden sm:block">HealthConnect</span>
+                    <span className="font-semibold text-gray-900 text-[15px] hidden sm:block">HealthConnect</span>
                 </Link>
 
                 {/* Nav - Desktop */}
                 <nav className="hidden md:flex items-center gap-1">
-
-                    {/* Admin & Doctor: hiển thị menu từ menuConfig */}
                     {isLoggedIn && roleMenu.length > 0 ? (
                         roleMenu.map(item => (
-                            <Link
-                                key={item.link}
-                                to={item.link}
-                                className={`px-3 py-2 text-sm rounded-lg transition font-medium
-                                    ${location.pathname === item.link
-                                        ? 'bg-indigo-50 text-indigo-600'
-                                        : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'
-                                    }`}
-                            >
+                            <Link key={item.link} to={item.link} className={navLinkClass(item.link)}>
                                 {item.name}
                             </Link>
                         ))
                     ) : (
-                        // Patient & Guest: hiển thị menu public
                         <>
-                            <Link to="/home"
-                                className={`px-3 py-2 text-sm rounded-lg transition font-medium
-                                    ${location.pathname === '/home' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'}`}>
-                                Trang chủ
-                            </Link>
-                            <Link to="/booking"
-                                className={`px-3 py-2 text-sm font-semibold rounded-lg transition
-                                    ${location.pathname === '/booking' ? 'bg-indigo-100 text-indigo-700' : 'text-indigo-600 hover:bg-indigo-50'}`}>
-                                Đặt lịch khám
-                            </Link>
+                            <Link to="/home" className={navLinkClass('/home')}>Home</Link>
+                            <Link to="/booking" className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                                location.pathname === '/booking' ? 'text-blue-600' : 'text-gray-600 hover:text-gray-900'
+                            }`}>Book Appointment</Link>
                             {isLoggedIn && roleId === 'R3' && (
-                                <Link to="/my-bookings"
-                                    className={`px-3 py-2 text-sm rounded-lg transition font-medium
-                                        ${location.pathname === '/my-bookings' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'}`}>
-                                    Lịch hẹn của tôi
-                                </Link>
+                                <Link to="/my-bookings" className={navLinkClass('/my-bookings')}>My Appointments</Link>
                             )}
                         </>
                     )}
                 </nav>
 
-                {/* Right: User dropdown */}
+                {/* Right */}
                 <div className="flex items-center gap-2">
                     {isLoggedIn ? (
                         <div className="relative">
                             <button
                                 onClick={() => setMenuOpen(!menuOpen)}
-                                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition"
+                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-gray-100 transition-colors duration-200"
                             >
-                                <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-sm font-semibold flex-shrink-0">
                                     {initial}
                                 </div>
                                 <span className="text-sm font-medium text-gray-700 hidden sm:block max-w-[120px] truncate">
                                     {displayName}
                                 </span>
-                                <svg className="w-4 h-4 text-gray-400 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
+                                <ChevronDown className="w-3.5 h-3.5 text-gray-400 hidden sm:block" />
                             </button>
 
-                            {/* Dropdown */}
                             {menuOpen && (
-                                <div className="absolute right-0 top-12 w-52 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
-                                    {/* User info */}
+                                <div className="absolute right-0 top-12 w-52 bg-white rounded-2xl shadow-xl border border-gray-200/60 py-1.5 z-50">
                                     <div className="px-4 py-3 border-b border-gray-100">
-                                        <p className="text-sm font-semibold text-gray-800 truncate">{displayName}</p>
-                                        <p className="text-xs text-gray-400 truncate">{userInfo?.email}</p>
-                                        <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-medium">
-                                            {roleId === 'R1' ? 'Admin' : roleId === 'R2' ? 'Bác sĩ' : 'Bệnh nhân'}
+                                        <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
+                                        <p className="text-xs text-gray-400 truncate mt-0.5">{userInfo?.email}</p>
+                                        <span className="inline-block mt-1.5 text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-semibold">
+                                            {roleId === 'R1' ? 'Admin' : roleId === 'R2' ? 'Doctor' : 'Patient'}
                                         </span>
                                     </div>
 
-                                    {/* Role menu items trong dropdown */}
                                     {roleMenu.map(item => (
                                         <Link key={item.link} to={item.link}
                                             onClick={() => setMenuOpen(false)}
-                                            className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition">
+                                            className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                                             {item.name}
                                         </Link>
                                     ))}
 
-                                    {/* Patient dropdown items */}
                                     {roleId === 'R3' && (
                                         <Link to="/my-bookings" onClick={() => setMenuOpen(false)}
-                                            className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition">
-                                            📅 Lịch hẹn của tôi
+                                            className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                                            <Calendar className="w-4 h-4 text-gray-400" />
+                                            My Appointments
                                         </Link>
                                     )}
 
                                     <hr className="my-1 border-gray-100" />
                                     <button onClick={handleLogout}
-                                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 w-full text-left transition">
-                                        🚪 Đăng xuất
+                                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 w-full text-left transition-colors">
+                                        <LogOut className="w-4 h-4" />
+                                        Sign Out
                                     </button>
                                 </div>
                             )}
@@ -137,23 +118,22 @@ const Header = () => {
                     ) : (
                         <div className="flex items-center gap-2">
                             <button onClick={() => navigate('/login')}
-                                className="text-sm font-medium text-gray-600 hover:text-indigo-600 px-3 py-2 rounded-lg hover:bg-gray-100 transition">
-                                Đăng nhập
+                                className="text-sm font-medium text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors">
+                                Sign In
                             </button>
                             <button onClick={() => navigate('/register')}
-                                className="text-sm font-medium text-gray-600 hover:text-indigo-600 px-3 py-2 rounded-lg hover:bg-gray-100 transition">
-                                Đăng ký
+                                className="text-sm font-medium text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors">
+                                Sign Up
                             </button>
                             <button onClick={() => navigate('/booking')}
-                                className="text-sm font-semibold bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
-                                Đặt lịch
+                                className="text-sm font-medium bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 active:scale-[0.98] transition-all duration-200 shadow-sm">
+                                Book
                             </button>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Overlay đóng dropdown */}
             {menuOpen && (
                 <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
             )}

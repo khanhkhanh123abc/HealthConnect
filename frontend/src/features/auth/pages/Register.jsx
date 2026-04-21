@@ -1,115 +1,88 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { registerUserService } from '../../auth/services/userService';
+import { Activity } from 'lucide-react';
 
 const Register = () => {
-    const [userData, setUserData] = useState({
-        email: '',
-        password: '',
-        firstName: '',
-        lastName: ''
-    });
-
+    const [userData, setUserData] = useState({ email: '', password: '', firstName: '', lastName: '' });
     const [isSuccess, setIsSuccess] = useState(false);
     const navigate = useNavigate();
 
+    const set = (key) => (e) => setUserData(prev => ({ ...prev, [key]: e.target.value }));
+
     const handleRegister = async () => {
-        // VALIDATION
         if (!userData.lastName || !userData.firstName || !userData.email || !userData.password) {
-            toast.error("Vui lòng điền đầy đủ tất cả thông tin!");
+            toast.error('Please fill in all required fields.');
             return;
         }
-
         try {
             const res = await registerUserService(userData);
-
-            // 🔥 FIX QUAN TRỌNG: res.data
-            if (res && res.data && res.data.errCode === 0) {
-                toast.success("Đăng ký thành công! Chuyển sang đăng nhập sau 5s...");
-
+            if (res?.data?.errCode === 0) {
+                toast.success('Registration successful! Redirecting to login in 3 seconds...');
                 setIsSuccess(true);
-
-                setTimeout(() => {
-                    navigate('/login');
-                }, 5000);
-
+                setTimeout(() => navigate('/login'), 3000);
             } else {
-                toast.error(res?.data?.message || "Đăng ký thất bại!");
+                toast.error(res?.data?.message || 'Registration failed.');
             }
-
-        } catch (error) {
-            console.error("Lỗi đăng ký:", error);
-            toast.error("Lỗi server, vui lòng thử lại!");
+        } catch {
+            toast.error('Server error, please try again.');
         }
     };
 
+    const inputClass = "w-full bg-gray-100 border-0 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-blue-500/30 focus:outline-none transition-all duration-200 disabled:opacity-50";
+
     return (
-        <div className="flex justify-center items-center min-h-screen bg-white">
-            <div className="bg-white p-10 rounded-lg w-full max-w-md border shadow-lg">
-
-                <h2 className="text-2xl font-bold mb-6">Tạo tài khoản</h2>
-
-                <div className="space-y-4">
-
-                    <div className="flex gap-3">
-                        <input
-                            type="text"
-                            placeholder="Họ"
-                            value={userData.lastName}
-                            onChange={(e) => setUserData({ ...userData, lastName: e.target.value })}
-                            disabled={isSuccess}
-                            className="w-full border p-2 rounded"
-                        />
-
-                        <input
-                            type="text"
-                            placeholder="Tên"
-                            value={userData.firstName}
-                            onChange={(e) => setUserData({ ...userData, firstName: e.target.value })}
-                            disabled={isSuccess}
-                            className="w-full border p-2 rounded"
-                        />
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
+            <div className="w-full max-w-sm">
+                <div className="flex flex-col items-center mb-8">
+                    <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mb-3 shadow-sm">
+                        <Activity className="w-6 h-6 text-white" />
                     </div>
-
-                    <input
-                        type="email"
-                        placeholder="Email"
-                        value={userData.email}
-                        onChange={(e) => setUserData({ ...userData, email: e.target.value })}
-                        disabled={isSuccess}
-                        className="w-full border p-2 rounded"
-                    />
-
-                    <input
-                        type="password"
-                        placeholder="Mật khẩu"
-                        value={userData.password}
-                        onChange={(e) => setUserData({ ...userData, password: e.target.value })}
-                        disabled={isSuccess}
-                        className="w-full border p-2 rounded"
-                    />
-
-                    <button
-                        onClick={handleRegister}
-                        disabled={isSuccess}
-                        className={`w-full py-2 rounded text-white font-semibold transition
-                            ${isSuccess ? 'bg-green-500' : 'bg-blue-600 hover:bg-blue-700'}`}
-                    >
-                        {isSuccess ? 'Đang chuyển hướng...' : 'Đăng ký'}
-                    </button>
-
-                    <div className="text-center text-sm">
-                        Đã có tài khoản?{" "}
-                        <span
-                            onClick={() => navigate('/login')}
-                            className="text-blue-600 cursor-pointer"
-                        >
-                            Đăng nhập
-                        </span>
-                    </div>
-
+                    <h1 className="text-2xl font-semibold text-gray-900">Create an account</h1>
+                    <p className="text-sm text-gray-500 mt-1">Sign up to use HealthConnect</p>
                 </div>
+
+                <div className="bg-white rounded-2xl border border-gray-200/60 p-6">
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-medium text-gray-700">Last name</label>
+                                <input type="text" placeholder="Smith" value={userData.lastName}
+                                    onChange={set('lastName')} disabled={isSuccess} className={inputClass} />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-medium text-gray-700">First name</label>
+                                <input type="text" placeholder="John" value={userData.firstName}
+                                    onChange={set('firstName')} disabled={isSuccess} className={inputClass} />
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" placeholder="you@example.com" value={userData.email}
+                                onChange={set('email')} disabled={isSuccess} className={inputClass} />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-gray-700">Password</label>
+                            <input type="password" placeholder="••••••••" value={userData.password}
+                                onChange={set('password')} disabled={isSuccess} className={inputClass} />
+                        </div>
+
+                        <button onClick={handleRegister} disabled={isSuccess}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl text-sm active:scale-[0.98] transition-all duration-200 disabled:opacity-50 mt-1">
+                            {isSuccess ? 'Redirecting...' : 'Sign Up'}
+                        </button>
+                    </div>
+                </div>
+
+                <p className="text-center text-sm text-gray-500 mt-6">
+                    Already have an account?{' '}
+                    <Link to="/login" className="text-blue-600 font-medium hover:text-blue-700 transition-colors">
+                        Sign in
+                    </Link>
+                </p>
             </div>
         </div>
     );

@@ -11,6 +11,9 @@ import { getAllClinics } from '../services/clinicService';
 
 const mdParser = new MarkdownIt();
 
+const LABEL = 'block text-xs font-medium text-gray-500 mb-1.5';
+const INPUT = 'w-full bg-gray-100 border-0 rounded-xl px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/30 transition-all';
+
 const buildDataSelect = (inputData, type) => {
     let result = [];
     let response = inputData?.data ? inputData.data : inputData;
@@ -62,96 +65,55 @@ const ManageDoctor = () => {
                     payments: buildDataSelect(resPay),
                     provinces: buildDataSelect(resProv)
                 });
-            } catch (_error) {
-                toast.error("Không thể tải danh sách dữ liệu!");
+            } catch {
+                toast.error('Failed to load data.');
             }
         };
         fetchAllData();
     }, []);
 
-    // ✅ Khi chọn bác sĩ → fetch data → đổ vào form
     const handleSelectDoctor = async (selectedOption) => {
         setSelectedDoctor(selectedOption);
-
-        if (!selectedOption) {
-            clearForm();
-            return;
-        }
+        if (!selectedOption) { clearForm(); return; }
 
         setIsLoading(true);
         try {
             let res = await getProfileDoctorById(selectedOption.value);
-
-            if (res && res.data && res.data.errCode === 0) {
+            if (res?.data?.errCode === 0) {
                 let data = res.data.data;
-
-                // Đổ Markdown
                 if (data.Markdown) {
                     setDescriptionHTML(data.Markdown.contentHTML || '');
                     setDescriptionMarkdown(data.Markdown.contentMarkdown || '');
                     setDescription(data.Markdown.description || '');
-
-                    // Đổ Specialty & Clinic từ Markdown
-                    if (data.Markdown.specialtyId) {
-                        let found = lists.specialties.find(s => s.value === data.Markdown.specialtyId);
-                        setSelectedSpecialty(found || null);
-                    } else {
-                        setSelectedSpecialty(null);
-                    }
-                    if (data.Markdown.clinicId) {
-                        let found = lists.clinics.find(c => c.value === data.Markdown.clinicId);
-                        setSelectedClinic(found || null);
-                    } else {
-                        setSelectedClinic(null);
-                    }
+                    setSelectedSpecialty(lists.specialties.find(s => s.value === data.Markdown.specialtyId) || null);
+                    setSelectedClinic(lists.clinics.find(c => c.value === data.Markdown.clinicId) || null);
                 } else {
-                    setDescriptionHTML('');
-                    setDescriptionMarkdown('');
-                    setDescription('');
-                    setSelectedSpecialty(null);
-                    setSelectedClinic(null);
+                    setDescriptionHTML(''); setDescriptionMarkdown(''); setDescription('');
+                    setSelectedSpecialty(null); setSelectedClinic(null);
                 }
-
-                // Đổ Doctor_Info
                 if (data.Doctor_Info) {
-                    let priceFound = lists.prices.find(p => p.value === data.Doctor_Info.priceId);
-                    let payFound = lists.payments.find(p => p.value === data.Doctor_Info.paymentId);
-                    let provFound = lists.provinces.find(p => p.value === data.Doctor_Info.provinceId);
-
-                    setSelectedPrice(priceFound || null);
-                    setSelectedPayment(payFound || null);
-                    setSelectedProvince(provFound || null);
+                    setSelectedPrice(lists.prices.find(p => p.value === data.Doctor_Info.priceId) || null);
+                    setSelectedPayment(lists.payments.find(p => p.value === data.Doctor_Info.paymentId) || null);
+                    setSelectedProvince(lists.provinces.find(p => p.value === data.Doctor_Info.provinceId) || null);
                     setNote(data.Doctor_Info.note || '');
                 } else {
-                    setSelectedPrice(null);
-                    setSelectedPayment(null);
-                    setSelectedProvince(null);
-                    setNote('');
+                    setSelectedPrice(null); setSelectedPayment(null); setSelectedProvince(null); setNote('');
                 }
-
-                if (data.Markdown || data.Doctor_Info) {
-                    toast.info("Đã tải thông tin bác sĩ!");
-                }
+                if (data.Markdown || data.Doctor_Info) toast.info('Doctor info loaded.');
             }
-        } catch (error) {
-            console.log("Lỗi fetch doctor info:", error);
+        } catch {
+            console.error('Error fetching doctor info');
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleEditorChange = ({ html, text }) => {
-        setDescriptionHTML(html);
-        setDescriptionMarkdown(text);
-    };
-
     const handleSaveDoctorInfo = async () => {
         if (!selectedDoctor || !descriptionHTML || !selectedPrice || !selectedPayment || !selectedProvince) {
-            toast.error("Vui lòng điền đầy đủ các trường bắt buộc!");
+            toast.error('Please fill in all required fields.');
             return;
         }
-
-        const dataToSend = {
+        const res = await saveDetailDoctorService({
             doctorId: selectedDoctor.value,
             contentHTML: descriptionHTML,
             contentMarkdown: descriptionMarkdown,
@@ -162,129 +124,104 @@ const ManageDoctor = () => {
             specialtyId: selectedSpecialty?.value || null,
             clinicId: selectedClinic?.value || null,
             note
-        };
-
-        const res = await saveDetailDoctorService(dataToSend);
+        });
         const isSuccess = res?.errCode === 0 || res?.data?.errCode === 0;
-
-        if (isSuccess) {
-            toast.success("Lưu thông tin Bác sĩ thành công!");
-        } else {
-            toast.error("Lỗi khi lưu thông tin!");
-        }
+        if (isSuccess) toast.success('Doctor info saved successfully.');
+        else toast.error('Failed to save info.');
     };
 
     const clearForm = () => {
-        setSelectedDoctor(null);
-        setSelectedPrice(null);
-        setSelectedPayment(null);
-        setSelectedProvince(null);
-        setSelectedSpecialty(null);
-        setSelectedClinic(null);
-        setDescription('');
-        setNote('');
-        setDescriptionHTML('');
-        setDescriptionMarkdown('');
+        setSelectedDoctor(null); setSelectedPrice(null); setSelectedPayment(null);
+        setSelectedProvince(null); setSelectedSpecialty(null); setSelectedClinic(null);
+        setDescription(''); setNote(''); setDescriptionHTML(''); setDescriptionMarkdown('');
     };
 
     return (
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-gray-100 min-h-screen">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6 uppercase">Quản lý Thông tin Bác sĩ</h2>
-
-            {/* BLOCK 1: CHỌN BÁC SĨ */}
-            <div className="grid grid-cols-2 gap-6 mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-gray-700">
-                        Chọn Bác sĩ
-                        {isLoading && (
-                            <span className="ml-2 text-indigo-500 font-normal animate-pulse">
-                                Đang tải dữ liệu...
-                            </span>
-                        )}
-                    </label>
-                    <Select
-                        value={selectedDoctor}
-                        onChange={handleSelectDoctor}
-                        options={lists.doctors}
-                        placeholder="Gõ để tìm kiếm..."
-                        className="text-sm"
-                        isClearable
-                    />
-                </div>
-                <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-gray-700">Đoạn giới thiệu ngắn</label>
-                    <textarea
-                        className="border border-gray-300 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        rows="3"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Bác sĩ chuyên khoa II..."
-                    />
-                </div>
-            </div>
-
-            {/* BLOCK 2: THÔNG TIN KHÁM */}
-            <div className="grid grid-cols-3 gap-6 mb-6">
-                <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-gray-700">Giá khám</label>
-                    <Select value={selectedPrice} onChange={setSelectedPrice} options={lists.prices} placeholder="Chọn giá..." />
-                </div>
-                <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-gray-700">Phương thức thanh toán</label>
-                    <Select value={selectedPayment} onChange={setSelectedPayment} options={lists.payments} placeholder="Chọn phương thức..." />
-                </div>
-                <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-gray-700">Tỉnh thành</label>
-                    <Select value={selectedProvince} onChange={setSelectedProvince} options={lists.provinces} placeholder="Chọn tỉnh thành..." />
-                </div>
-            </div>
-
-            {/* BLOCK 3: PHÒNG KHÁM & CHUYÊN KHOA */}
-            <div className="grid grid-cols-3 gap-6 mb-8">
-                <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-gray-700">Chuyên khoa</label>
-                    <Select value={selectedSpecialty} onChange={setSelectedSpecialty} options={lists.specialties} placeholder="Chọn chuyên khoa..." />
-                </div>
-                <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-gray-700">Phòng khám</label>
-                    <Select value={selectedClinic} onChange={setSelectedClinic} options={lists.clinics} placeholder="Chọn phòng khám..." />
-                </div>
-                <div className="flex flex-col gap-2">
-                    <label className="text-sm font-semibold text-gray-700">Ghi chú thêm</label>
-                    <input
-                        type="text"
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        className="border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        placeholder="VD: Không khám chủ nhật"
-                    />
-                </div>
-            </div>
-
-            {/* BLOCK 4: MARKDOWN EDITOR */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="mb-6">
-                <label className="text-sm font-semibold text-gray-700 block mb-2">Bài viết giới thiệu chi tiết</label>
-                <MdEditor
-                    style={{ height: '400px' }}
-                    renderHTML={text => mdParser.render(text)}
-                    onChange={handleEditorChange}
-                    value={descriptionMarkdown}
-                />
+                <h1 className="text-2xl font-semibold text-gray-900">Doctor Profile Management</h1>
+                <p className="text-sm text-gray-500 mt-1">Select a doctor to view and update their profile</p>
             </div>
 
-            <div className="flex justify-end gap-3">
-                <button
-                    onClick={clearForm}
-                    className="border border-gray-300 text-gray-600 font-bold py-2.5 px-6 rounded-lg transition hover:bg-gray-50"
-                >
-                    Xóa form
-                </button>
-                <button
-                    onClick={handleSaveDoctorInfo}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-lg transition-colors shadow-md"
-                >
-                    Lưu thông tin
-                </button>
+            <div className="bg-white rounded-2xl border border-gray-200/60 p-6 space-y-6">
+
+                {/* Doctor select + intro */}
+                <div className="grid grid-cols-2 gap-6 pb-6 border-b border-gray-100">
+                    <div>
+                        <label className={LABEL}>
+                            Select Doctor
+                            {isLoading && <span className="ml-2 text-blue-500 font-normal animate-pulse">Loading...</span>}
+                        </label>
+                        <Select value={selectedDoctor} onChange={handleSelectDoctor}
+                            options={lists.doctors} placeholder="Type to search..."
+                            className="text-sm" isClearable />
+                    </div>
+                    <div>
+                        <label className={LABEL}>Short Introduction</label>
+                        <textarea className={INPUT} rows="3" value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Specialist in..." />
+                    </div>
+                </div>
+
+                {/* Price / Payment / Province */}
+                <div className="grid grid-cols-3 gap-6 pb-6 border-b border-gray-100">
+                    <div>
+                        <label className={LABEL}>Consultation Fee</label>
+                        <Select value={selectedPrice} onChange={setSelectedPrice}
+                            options={lists.prices} placeholder="Select fee..." className="text-sm" />
+                    </div>
+                    <div>
+                        <label className={LABEL}>Payment Method</label>
+                        <Select value={selectedPayment} onChange={setSelectedPayment}
+                            options={lists.payments} placeholder="Select method..." className="text-sm" />
+                    </div>
+                    <div>
+                        <label className={LABEL}>Province / City</label>
+                        <Select value={selectedProvince} onChange={setSelectedProvince}
+                            options={lists.provinces} placeholder="Select province..." className="text-sm" />
+                    </div>
+                </div>
+
+                {/* Specialty / Clinic / Note */}
+                <div className="grid grid-cols-3 gap-6 pb-6 border-b border-gray-100">
+                    <div>
+                        <label className={LABEL}>Specialty</label>
+                        <Select value={selectedSpecialty} onChange={setSelectedSpecialty}
+                            options={lists.specialties} placeholder="Select specialty..." className="text-sm" />
+                    </div>
+                    <div>
+                        <label className={LABEL}>Clinic</label>
+                        <Select value={selectedClinic} onChange={setSelectedClinic}
+                            options={lists.clinics} placeholder="Select clinic..." className="text-sm" />
+                    </div>
+                    <div>
+                        <label className={LABEL}>Additional Note</label>
+                        <input type="text" value={note} onChange={(e) => setNote(e.target.value)}
+                            className={INPUT} placeholder="E.g. No appointments on Sundays" />
+                    </div>
+                </div>
+
+                {/* Markdown editor */}
+                <div>
+                    <label className={LABEL + ' mb-2'}>Detailed Profile Article</label>
+                    <MdEditor style={{ height: '400px', borderRadius: '12px', overflow: 'hidden' }}
+                        renderHTML={text => mdParser.render(text)}
+                        onChange={({ html, text }) => { setDescriptionHTML(html); setDescriptionMarkdown(text); }}
+                        value={descriptionMarkdown} />
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-3 pt-2">
+                    <button onClick={clearForm}
+                        className="px-5 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">
+                        Clear Form
+                    </button>
+                    <button onClick={handleSaveDoctorInfo}
+                        className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl active:scale-[0.98] transition-all duration-200 shadow-sm">
+                        Save Info
+                    </button>
+                </div>
             </div>
         </div>
     );

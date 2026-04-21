@@ -1,12 +1,14 @@
 export const adminMenu = [
-    { name: 'User Management', link: '/system/user-manage' },
-    { name: 'Doctor Management', link: '/system/doctor-manage' },
-    { name: 'Clinic Management', link: '/system/clinic-manage' },
-    { name: 'Specialty Management', link: '/system/specialty-manage' },
-    { name: 'Confirm payment', link: '/system/payment-manage' },
+    { name: 'Dashboard',        link: '/system/dashboard' },
+    { name: 'Users',            link: '/system/user-manage' },
+    { name: 'Doctors',          link: '/system/doctor-manage' },
+    { name: 'Clinics',          link: '/system/clinic-manage' },
+    { name: 'Specialties',      link: '/system/specialty-manage' },
+    { name: 'Confirm Payment',  link: '/system/payment-manage' },
 ];
 
 export const doctorMenu = [
-    { name: 'Schedule Management', link: '/doctor/manage-schedule' },
-    { name: 'Patient Management', link: '/doctor/manage-patient' },
+    { name: 'Dashboard', link: '/doctor/dashboard' },
+    { name: 'Schedule',  link: '/doctor/manage-schedule' },
+    { name: 'Patients',  link: '/doctor/manage-patient' },
 ];

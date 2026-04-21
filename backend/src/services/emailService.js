@@ -405,4 +405,52 @@ let sendBankTransferConfirmedEmail = async (data) => {
     return false;
   }
 };
-module.exports = { sendBookingConfirmEmail, sendCancelEmail, sendMedicalRecordEmail, sendBankTransferPendingEmail, sendBankTransferConfirmedEmail };
+// ===== GỬI EMAIL ĐƠN THUỐC (PDF ATTACHMENT) =====
+let sendPrescriptionEmail = async ({ patientEmail, patientName, doctorName, pdfBuffer }) => {
+  try {
+    await transporter.sendMail({
+      from: `"HealthConnect" <${process.env.EMAIL_APP}>`,
+      to: patientEmail,
+      subject: `[HealthConnect] Don thuoc dien tu tu BS. ${doctorName}`,
+      html: `
+        <div style="font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:40px 20px;">
+          <table width="600" cellpadding="0" cellspacing="0"
+            style="background:#fff;border-radius:16px;overflow:hidden;margin:0 auto;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+            <tr><td style="background:#4f46e5;padding:30px 40px;text-align:center;">
+              <h1 style="margin:0;color:#fff;font-size:22px;">Don Thuoc Dien Tu</h1>
+              <p style="color:#c7d2fe;margin:8px 0 0;">HealthConnect</p>
+            </td></tr>
+            <tr><td style="padding:32px 40px;">
+              <p style="color:#374151;font-size:15px;">Xin chao <strong>${patientName}</strong>,</p>
+              <p style="color:#374151;font-size:14px;line-height:1.6;">
+                BS. <strong>${doctorName}</strong> da gui don thuoc dien tu cua ban qua he thong HealthConnect.<br/>
+                Vui long xem file dinh kem duoi day va thuc hien theo huong dan cua bac si.
+              </p>
+              <div style="background:#f0f4ff;border-radius:12px;padding:16px 20px;margin:20px 0;border-left:4px solid #4f46e5;">
+                <p style="margin:0;color:#4f46e5;font-weight:600;font-size:13px;">
+                  📎 File don thuoc duoc dinh kem trong email nay.
+                </p>
+              </div>
+              <p style="color:#6b7280;font-size:12px;margin-top:24px;">
+                Neu co thac mac, vui long lien he phong kham hoac dat lai lich hen qua HealthConnect.
+              </p>
+            </td></tr>
+            <tr><td style="background:#f9fafb;padding:20px 40px;text-align:center;">
+              <p style="margin:0;color:#9ca3af;font-size:11px;">HealthConnect - He thong Y te Thong minh</p>
+            </td></tr>
+          </table>
+        </div>`,
+      attachments: [{
+        filename: `don-thuoc-${Date.now()}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      }]
+    });
+    return true;
+  } catch (e) {
+    console.error('Send prescription email error:', e.message);
+    return false;
+  }
+};
+
+module.exports = { sendBookingConfirmEmail, sendCancelEmail, sendMedicalRecordEmail, sendBankTransferPendingEmail, sendBankTransferConfirmedEmail, sendPrescriptionEmail };

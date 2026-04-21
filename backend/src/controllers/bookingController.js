@@ -120,6 +120,17 @@ let createPaypalOrder = async (req, res) => {
     }
 };
 
+let sendPrescription = async (req, res) => {
+    try {
+        const { bookingId, doctorId, diagnosis, medications, instructions } = req.body;
+        let info = await bookingService.sendPrescription(bookingId, doctorId, { diagnosis, medications, instructions });
+        return res.status(200).json(info);
+    } catch (e) {
+        console.error('[Prescription] error:', e);
+        return res.status(200).json({ errCode: -1, errMessage: 'Error from server' });
+    }
+};
+
 // PayPal redirect user về đây sau khi approve
 let paypalReturn = async (req, res) => {
     try {
@@ -145,4 +156,5 @@ module.exports = {
     getPendingBankBookings,
     createPaypalOrder,
     paypalReturn,
+    sendPrescription,
 }

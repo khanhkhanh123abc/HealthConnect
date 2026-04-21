@@ -1,94 +1,22 @@
 import React, { Fragment } from 'react';
-import { useSelector } from 'react-redux';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
-import Login from './features/auth/pages/Login';
-import Register from './features/auth/pages/Register';
-import Home from './features/home/pages/Home';
-import System from './features/admin/pages/System';
-import Doctor from './features/doctor/pages/Doctor';
-import DefaultLayout from './layouts/DefaultLayout';
-import DoctorDetail from './features/admin/pages/DoctorDetail';
-import MyBookings from './features/booking/pages/MyBookings';
-import ConfirmBooking from './features/booking/pages/ConfirmBooking';
-import BookingPage from './features/booking/pages/BookingPage';
-import PaymentResult from './features/booking/pages/PaymentResult';
+import AppRoutes from './routes/AppRoutes';
 
 function App() {
-  const { isLoggedIn, userInfo } = useSelector((state) => state.user);
-
-  return (
-    <Fragment>
-      <Router>
-        <div className="main-container">
-          <main className="content-container">
-            <Routes>
-
-              {/* ===== PUBLIC ROUTES ===== */}
-              <Route path="/home" element={<Home />} />
-
-              <Route path="/login" element={
-                !isLoggedIn ? <Login /> : (
-                  <Navigate to={
-                    userInfo?.roleId === 'R1' ? '/system'
-                      : userInfo?.roleId === 'R2' ? '/doctor'
-                        : '/home'
-                  } replace />
-                )
-              } />
-
-              {/* 🔥 FIX QUAN TRỌNG */}
-              <Route path="/register" element={
-                !isLoggedIn ? <Register /> : (
-                  <Navigate to="/home" replace />
-                )
-              } />
-
-              <Route path="/confirm-booking" element={<ConfirmBooking />} />
-
-              <Route path="/booking" element={
-                <DefaultLayout><BookingPage /></DefaultLayout>
-              } />
-
-              <Route path="/doctor-profile/:id" element={
-                <DefaultLayout><DoctorDetail /></DefaultLayout>
-              } />
-
-              <Route path="/payment-result" element={<PaymentResult />} />
-
-              {/* ===== PRIVATE ROUTES ===== */}
-              <Route path="/my-bookings" element={
-                isLoggedIn
-                  ? <DefaultLayout><MyBookings /></DefaultLayout>
-                  : <Navigate to="/login" replace />
-              } />
-
-              <Route path="/system/*" element={
-                isLoggedIn && userInfo?.roleId === 'R1'
-                  ? <DefaultLayout><System /></DefaultLayout>
-                  : <Navigate to="/login" replace />
-              } />
-
-              <Route path="/doctor/*" element={
-                isLoggedIn && userInfo?.roleId === 'R2'
-                  ? <DefaultLayout><Doctor /></DefaultLayout>
-                  : <Navigate to="/login" replace />
-              } />
-
-              {/* ===== DEFAULT ===== */}
-              <Route path="/" element={<Navigate to="/home" replace />} />
-              <Route path="*" element={<Navigate to="/home" replace />} />
-
-            </Routes>
-          </main>
-
-          <ToastContainer position="bottom-right" autoClose={3000} />
-        </div>
-      </Router>
-    </Fragment>
-  );
+    return (
+        <Fragment>
+            <Router>
+                <div className="main-container">
+                    <main className="content-container">
+                        <AppRoutes />
+                    </main>
+                    <ToastContainer position="bottom-right" autoClose={3000} />
+                </div>
+            </Router>
+        </Fragment>
+    );
 }
 
 export default App;

@@ -1,14 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { CheckCircle, Info, XCircle, AlertTriangle, Activity } from 'lucide-react';
 import axios from '../../../app/axios';
 
-const STATUS = {
-    loading: 'loading',
-    success: 'success',
-    already: 'already',
-    cancelled: 'cancelled',
-    error: 'error'
-};
+const STATUS = { loading: 'loading', success: 'success', already: 'already', cancelled: 'cancelled', error: 'error' };
 
 const ConfirmBooking = () => {
     const [searchParams] = useSearchParams();
@@ -18,11 +13,7 @@ const ConfirmBooking = () => {
     const [message, setMessage] = useState('');
 
     useEffect(() => {
-        if (!token) {
-            setStatus(STATUS.error);
-            setMessage('Link không hợp lệ!');
-            return;
-        }
+        if (!token) { setStatus(STATUS.error); setMessage('Invalid link.'); return; }
         confirmBooking();
     }, [token]); // eslint-disable-line
 
@@ -31,114 +22,103 @@ const ConfirmBooking = () => {
             let res = await axios.get(`/api/confirm-booking?token=${token}`);
             const errCode = res?.data?.errCode;
             const errMessage = res?.data?.errMessage;
-
             if (errCode === 0) {
-                if (res?.data?.alreadyConfirmed) {
-                    setStatus(STATUS.already);
-                } else {
-                    setStatus(STATUS.success);
-                }
+                setStatus(res?.data?.alreadyConfirmed ? STATUS.already : STATUS.success);
                 setMessage(errMessage);
             } else if (errCode === 3) {
                 setStatus(STATUS.cancelled);
                 setMessage(errMessage);
             } else {
                 setStatus(STATUS.error);
-                setMessage(errMessage || 'Đã có lỗi xảy ra!');
+                setMessage(errMessage || 'An error occurred.');
             }
-        } catch (e) {
+        } catch {
             setStatus(STATUS.error);
-            setMessage('Không thể kết nối máy chủ. Vui lòng thử lại!');
+            setMessage('Could not connect to the server. Please try again.');
         }
     };
 
     const CONFIG = {
         [STATUS.loading]: {
-            icon: (
-                <svg className="animate-spin h-16 w-16 text-indigo-500" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-            ),
-            title: 'Đang xác nhận...',
-            subtitle: 'Vui lòng chờ trong giây lát',
-            color: 'text-indigo-600',
-            bg: 'bg-indigo-50',
-            border: 'border-indigo-200'
+            Icon: null,
+            spinner: true,
+            title: 'Confirming...',
+            subtitle: 'Please wait a moment',
+            iconBg: 'bg-blue-50',
+            iconColor: 'text-blue-500',
         },
         [STATUS.success]: {
-            icon: <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-4xl">✓</div>,
-            title: 'Xác nhận thành công!',
+            Icon: CheckCircle,
+            title: 'Confirmed Successfully',
             subtitle: message,
-            color: 'text-green-700',
-            bg: 'bg-green-50',
-            border: 'border-green-200'
+            iconBg: 'bg-emerald-50',
+            iconColor: 'text-emerald-500',
         },
         [STATUS.already]: {
-            icon: <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-4xl">ℹ</div>,
-            title: 'Đã xác nhận trước đó',
+            Icon: Info,
+            title: 'Already Confirmed',
             subtitle: message,
-            color: 'text-blue-700',
-            bg: 'bg-blue-50',
-            border: 'border-blue-200'
+            iconBg: 'bg-blue-50',
+            iconColor: 'text-blue-500',
         },
         [STATUS.cancelled]: {
-            icon: <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center text-4xl">✕</div>,
-            title: 'Lịch hẹn đã bị hủy',
+            Icon: XCircle,
+            title: 'Appointment Cancelled',
             subtitle: message,
-            color: 'text-red-700',
-            bg: 'bg-red-50',
-            border: 'border-red-200'
+            iconBg: 'bg-red-50',
+            iconColor: 'text-red-500',
         },
         [STATUS.error]: {
-            icon: <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center text-4xl">⚠</div>,
-            title: 'Không thể xác nhận',
+            Icon: AlertTriangle,
+            title: 'Unable to Confirm',
             subtitle: message,
-            color: 'text-yellow-700',
-            bg: 'bg-yellow-50',
-            border: 'border-yellow-200'
-        }
+            iconBg: 'bg-amber-50',
+            iconColor: 'text-amber-500',
+        },
     };
 
     const cfg = CONFIG[status];
+    const { Icon } = cfg;
 
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 w-full max-w-md overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-200/60 w-full max-w-md overflow-hidden">
 
                 {/* Header */}
-                <div className="bg-indigo-600 px-8 py-6 text-center">
-                    <h1 className="text-white font-bold text-xl">HealthConnect</h1>
-                    <p className="text-indigo-200 text-sm mt-1">Xác nhận lịch khám</p>
+                <div className="px-8 py-6 border-b border-gray-100 flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center">
+                        <Activity className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-semibold text-gray-900">HealthConnect</p>
+                        <p className="text-xs text-gray-400">Appointment Confirmation</p>
+                    </div>
                 </div>
 
                 {/* Content */}
-                <div className={`px-8 py-10 text-center ${cfg.bg} border-b ${cfg.border}`}>
-                    <div className="flex justify-center mb-5">
-                        {cfg.icon}
+                <div className="px-8 py-10 text-center">
+                    <div className={`w-16 h-16 ${cfg.iconBg} rounded-2xl flex items-center justify-center mx-auto mb-5`}>
+                        {cfg.spinner ? (
+                            <svg className={`animate-spin w-8 h-8 ${cfg.iconColor}`} viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                            </svg>
+                        ) : Icon && <Icon className={`w-8 h-8 ${cfg.iconColor}`} />}
                     </div>
-                    <h2 className={`text-xl font-bold mb-2 ${cfg.color}`}>
-                        {cfg.title}
-                    </h2>
-                    <p className="text-gray-500 text-sm leading-relaxed">
-                        {cfg.subtitle}
-                    </p>
+                    <h2 className="text-xl font-semibold text-gray-900 mb-2">{cfg.title}</h2>
+                    <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto">{cfg.subtitle}</p>
                 </div>
 
                 {/* Actions */}
                 {status !== STATUS.loading && (
-                    <div className="px-8 py-6 flex flex-col gap-3">
-                        <button
-                            onClick={() => navigate('/my-bookings')}
-                            className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition"
-                        >
-                            Xem lịch hẹn của tôi
+                    <div className="px-8 pb-8 flex flex-col gap-3">
+                        <button onClick={() => navigate('/my-bookings')}
+                            className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium text-sm hover:bg-blue-700 active:scale-[0.98] transition-all duration-200">
+                            View my appointments
                         </button>
-                        <button
-                            onClick={() => navigate('/home')}
-                            className="w-full py-3 border border-gray-300 text-gray-600 rounded-xl font-semibold hover:bg-gray-50 transition"
-                        >
-                            Về trang chủ
+                        <button onClick={() => navigate('/home')}
+                            className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm hover:bg-gray-200 active:scale-[0.98] transition-all duration-200">
+                            Go home
                         </button>
                     </div>
                 )}

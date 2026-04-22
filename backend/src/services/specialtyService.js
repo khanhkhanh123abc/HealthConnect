@@ -32,7 +32,7 @@ let getAllSpecialty = () => {
     return new Promise(async (resolve, reject) => {
         try {
             let data = await db.Specialty.findAll({
-                attributes: ['id', 'name'] // Chỉ lấy id và tên cho nhẹ
+                attributes: ['id', 'name', 'image', 'descriptionHTML', 'descriptionMarkdown']
             });
             resolve({ errCode: 0, errMessage: 'Ok', data });
         } catch (e) {

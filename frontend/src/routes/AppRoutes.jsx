@@ -23,7 +23,7 @@ const AppRoutes = () => {
     return (
         <Routes>
             {/* ===== PUBLIC ===== */}
-            <Route path="/home" element={<DefaultLayout><Home /></DefaultLayout>} />
+            <Route path="/home" element={<Home />} />
 
             <Route path="/login" element={
                 !isLoggedIn ? <Login /> : (

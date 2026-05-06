@@ -1,5 +1,4 @@
 import express from 'express';
-import homeController from '../controllers/homeController.js';
 import userController from '../controllers/userController.js';
 import doctorController from '../controllers/doctorController.js';
 import specialtyController from '../controllers/specialtyController.js';
@@ -10,23 +9,15 @@ import statsController from '../controllers/statsController.js';
 
 let router = express.Router();
 
-let initWebRoutes = (app) => {
-    router.get('/', homeController.getHomePage);
-    router.get('/crud', homeController.getCRUD);
-    router.post('/post-crud', homeController.postCRUD);
-    router.get('/edit-crud', homeController.getEditCRUD);
-    router.post('/put-crud', homeController.putCRUD);
-    router.get('/delete-crud', homeController.deleteCRUD);
-    router.get('/get-crud', homeController.displayGetCRUD);
-
+const initWebRoutes = (app) => {
     // User
     router.post('/api/login', userController.handleLogin);
+    router.post('/api/register', userController.handleRegister);
     router.get('/api/get-all-users', userController.handleGetAllUsers);
     router.post('/api/create-new-user', userController.handleCreateNewUser);
     router.put('/api/edit-user', userController.handleEditUser);
     router.delete('/api/delete-user', userController.handleDeleteUser);
     router.get('/api/allcode', userController.getAllCode);
-    router.post('/api/register', userController.handleRegister);
 
     // Doctor
     router.get('/api/top-doctor-home', doctorController.getTopDoctorHome);
@@ -35,7 +26,6 @@ let initWebRoutes = (app) => {
     router.get('/api/get-profile-doctor-by-id', doctorController.getProfileDoctorById);
     router.post('/api/bulk-create-schedule', doctorController.bulkCreateSchedule);
     router.get('/api/get-schedule-doctor-by-date', doctorController.getScheduleByDate);
-    // Booking flow
     router.get('/api/get-clinics-by-specialty', doctorController.getClinicsBySpecialty);
     router.get('/api/get-doctors-by-clinic', doctorController.getDoctorsByClinicAndSpecialty);
 
@@ -48,8 +38,10 @@ let initWebRoutes = (app) => {
     // Clinic
     router.post('/api/create-new-clinic', clinicController.createClinic);
     router.get('/api/get-all-clinic', clinicController.getAllClinics);
+    router.get('/api/get-clinic-by-id', clinicController.getClinicById);
     router.put('/api/update-clinic', clinicController.updateClinic);
     router.delete('/api/delete-clinic', clinicController.deleteClinic);
+    router.get('/api/get-doctors-by-clinic-id', clinicController.getDoctorsByClinic);
 
     // Booking
     router.post('/api/create-booking', bookingController.createBooking);
@@ -63,18 +55,18 @@ let initWebRoutes = (app) => {
     router.put('/api/confirm-payment', bookingController.confirmPayment);
     router.get('/api/get-pending-bank-bookings', bookingController.getPendingBankBookings);
     router.put('/api/doctor-cancel-booking', bookingController.doctorCancelBooking);
-    // PayPal
     router.post('/api/create-paypal-order', bookingController.createPaypalOrder);
     router.get('/api/paypal-return', bookingController.paypalReturn);
-    // Prescription
     router.post('/api/send-prescription', bookingController.sendPrescription);
+
     // Search
     router.get('/api/global-search', searchController.globalSearch);
-    // Stats / Dashboard
+
+    // Stats
     router.get('/api/admin-stats', statsController.getAdminStats);
     router.get('/api/doctor-stats', statsController.getDoctorStats);
 
     return app.use('/', router);
-}
+};
 
 module.exports = initWebRoutes;

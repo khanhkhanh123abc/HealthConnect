@@ -1,7 +1,14 @@
 import db from '../models/index';
 import { Op } from 'sequelize';
 import { v4 as uuidv4 } from 'uuid';
-import { sendBookingConfirmEmail, sendCancelEmail } from './emailService';
+import {
+    sendBookingConfirmEmail,
+    sendCancelEmail,
+    sendMedicalRecordEmail,
+    sendBankTransferPendingEmail,
+    sendBankTransferConfirmedEmail,
+    sendPrescriptionEmail,
+} from './emailService';
 import { createRefund } from './paypalService';
 
 const DAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
@@ -195,7 +202,6 @@ let createBooking = (data) => {
                     const dateStr = formatDate(data.date);
 
                     if (data.paymentMethod === 'BANK') {
-                        const { sendBankTransferPendingEmail } = require('./emailService');
                         await sendBankTransferPendingEmail({
                             patientEmail: patient?.email,
                             patientName,
@@ -206,6 +212,7 @@ let createBooking = (data) => {
                             clinicAddress,
                             reason: data.reason || '',
                             bookingToken: confirmToken,
+                            amountUsd: priceAmountUsd,
                         });
                     } else {
                         const confirmLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/confirm-booking?token=${confirmToken}`;
@@ -767,7 +774,6 @@ let sendMedicalRecord = (bookingId, doctorId, content) => {
                 resolve({ errCode: 3, errMessage: 'Không tìm thấy email bệnh nhân!' });
                 return;
             }
-            const { sendMedicalRecordEmail } = require('./emailService');
             await sendMedicalRecordEmail({
                 patientEmail: patient.email,
                 patientName: `${patient.lastName || ''} ${patient.firstName || ''}`.trim(),
@@ -831,7 +837,6 @@ let confirmPayment = (bookingId) => {
                         attributes: ['value'],
                         raw: true
                     });
-                    const { sendBankTransferConfirmedEmail } = require('./emailService');
                     await sendBankTransferConfirmedEmail({
                         patientEmail: patient?.email,
                         patientName: `${patient?.lastName || ''} ${patient?.firstName || ''}`.trim(),
@@ -915,7 +920,6 @@ let sendPrescription = async (bookingId, doctorId, { diagnosis, medications, ins
     const doctorName = `BS. ${doctor?.lastName || ''} ${doctor?.firstName || ''}`.trim();
 
     const { generatePrescriptionPdf } = require('./prescriptionService');
-    const { sendPrescriptionEmail } = require('./emailService');
 
     const pdfBuffer = await generatePrescriptionPdf({
         doctorName,

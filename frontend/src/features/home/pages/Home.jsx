@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useLocation } from 'react-router-dom';
-import { ChevronRight, Calendar, MapPin, Stethoscope } from 'lucide-react';
+import { ChevronRight, Calendar, MapPin, Stethoscope, Building2 } from 'lucide-react';
 import HomeHeader from '../../../shared/components/Header/Header';
 import { getTopDoctorHomeService } from '../../doctor/services/doctorService';
+import { getAllClinicsService } from '../../clinic/services/clinicService';
 import axios from '../../../app/axios';
 
 const Home = () => {
@@ -14,8 +15,10 @@ const Home = () => {
 
     const [topDoctors, setTopDoctors] = useState([]);
     const [specialties, setSpecialties] = useState([]);
+    const [clinics, setClinics] = useState([]);
     const [isLoadingDoctors, setIsLoadingDoctors] = useState(true);
     const [isLoadingSpecialties, setIsLoadingSpecialties] = useState(true);
+    const [isLoadingClinics, setIsLoadingClinics] = useState(true);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState({ doctors: [], specialties: [] });
@@ -38,8 +41,16 @@ const Home = () => {
             } catch {}
             finally { setIsLoadingSpecialties(false); }
         };
+        const fetchClinics = async () => {
+            try {
+                let res = await getAllClinicsService();
+                if (res?.data?.errCode === 0) setClinics((res.data.data || []).slice(0, 6));
+            } catch {}
+            finally { setIsLoadingClinics(false); }
+        };
         fetchDoctors();
         fetchSpecialties();
+        fetchClinics();
     }, [location.pathname]);
 
     useEffect(() => {
@@ -212,6 +223,72 @@ const Home = () => {
                         </div>
                     ) : (
                         <div className="text-center py-12 text-gray-400 text-sm">No specialties available</div>
+                    )}
+                </div>
+            </section>
+
+            {/* ── FEATURED CLINICS ── */}
+            <section className="py-16 bg-gray-50">
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between items-end mb-8">
+                        <div>
+                            <h2 className="text-2xl font-semibold text-gray-900">Featured Clinics</h2>
+                            <p className="text-sm text-gray-500 mt-1">Trusted medical facilities near you</p>
+                        </div>
+                        <button onClick={() => navigate('/booking')}
+                            className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition-colors">
+                            View all <ChevronRight className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    {isLoadingClinics ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+                            {[...Array(6)].map((_, i) => (
+                                <div key={i} className="bg-white rounded-2xl border border-gray-200 p-5 animate-pulse flex gap-4">
+                                    <div className="w-16 h-16 bg-gray-200 rounded-xl flex-shrink-0" />
+                                    <div className="flex-1 space-y-2 pt-1">
+                                        <div className="h-3.5 bg-gray-200 rounded w-3/4" />
+                                        <div className="h-3 bg-gray-100 rounded w-full" />
+                                        <div className="h-3 bg-gray-100 rounded w-1/2" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : clinics.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+                            {clinics.map(clinic => (
+                                <button key={clinic.id} onClick={() => navigate(`/clinic/${clinic.id}`)}
+                                    className="bg-white rounded-2xl border border-gray-200/60 p-5 flex gap-4 items-start text-left hover:shadow-lg hover:-translate-y-0.5 hover:shadow-gray-200/50 hover:border-blue-200 transition-all duration-300 group">
+                                    {clinic.image ? (
+                                        <img
+                                            src={clinic.image}
+                                            alt={clinic.name}
+                                            className="w-16 h-16 rounded-xl object-cover border border-gray-200 flex-shrink-0 group-hover:border-blue-200 transition-colors"
+                                        />
+                                    ) : (
+                                        <div className="w-16 h-16 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0 border border-blue-100">
+                                            <Building2 className="w-7 h-7 text-blue-400" />
+                                        </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold text-gray-900 text-sm group-hover:text-blue-600 transition-colors leading-snug">
+                                            {clinic.name}
+                                        </h3>
+                                        {clinic.address && (
+                                            <p className="text-xs text-gray-400 mt-1.5 flex items-start gap-1 leading-relaxed line-clamp-2">
+                                                <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0 mt-0.5" />
+                                                {clinic.address}
+                                            </p>
+                                        )}
+                                        <span className="inline-block mt-2 text-xs text-blue-600 font-medium group-hover:underline">
+                                            View details →
+                                        </span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-12 text-gray-400 text-sm">No clinics available</div>
                     )}
                 </div>
             </section>

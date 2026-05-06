@@ -216,7 +216,12 @@ let sendBookingConfirmEmail = async (data) => {
 
 // ===== GỬI EMAIL KHI HỦY LỊCH =====
 let sendCancelEmail = async (data) => {
+  if (!data.patientEmail) {
+    console.error('sendCancelEmail: missing patientEmail');
+    return false;
+  }
   try {
+    const { refundNote, cancelReason } = data;
     const html = `
 <!DOCTYPE html>
 <html lang="vi">
@@ -238,6 +243,16 @@ let sendCancelEmail = async (data) => {
           vào lúc <strong>${data.timeValue}</strong>, ngày <strong>${data.dateStr}</strong>
           đã được hủy thành công.
         </p>
+        ${cancelReason ? `
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+          <p style="margin:0;color:#b91c1c;font-size:13px;">
+            <strong>Lý do hủy:</strong> ${cancelReason}
+          </p>
+        </div>` : ''}
+        ${refundNote ? `
+        <div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+          <p style="margin:0;color:#065f46;font-size:13px;white-space:pre-line;">${refundNote}</p>
+        </div>` : ''}
         <p style="color:#6b7280;font-size:14px;margin:0;">
           Nếu bạn muốn đặt lịch khác, hãy truy cập lại hệ thống HealthConnect.
         </p>
@@ -316,7 +331,19 @@ ${data.content}
 };
 // ===== EMAIL THÔNG BÁO CHỜ CHUYỂN KHOẢN =====
 let sendBankTransferPendingEmail = async (data) => {
+  if (!data.patientEmail) {
+    console.error('sendBankTransferPendingEmail: missing patientEmail');
+    return false;
+  }
   try {
+    const bankName    = process.env.BANK_NAME        || 'MB Bank';
+    const bankAccount = process.env.BANK_ACCOUNT_NO  || '0123456789';
+    const bankOwner   = process.env.BANK_OWNER       || 'PHONG KHAM HEALTHCONNECT';
+    const transferRef = `TTKHAM ${data.bookingToken?.slice(-8)?.toUpperCase() || ''}`;
+    const amountLabel = data.amountUsd != null
+      ? `$${Number(data.amountUsd).toFixed(2)} USD`
+      : 'Liên hệ phòng khám';
+
     const html = `
 <!DOCTYPE html><html lang="vi">
 <body style="font-family:'Segoe UI',Arial,sans-serif;background:#f4f6f9;padding:40px 20px;">
@@ -334,12 +361,12 @@ let sendBankTransferPendingEmail = async (data) => {
       </p>
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:20px 24px;margin-bottom:20px;">
         <p style="margin:0 0 10px;color:#92400e;font-size:14px;font-weight:600;">Thông tin chuyển khoản</p>
-        <p style="margin:4px 0;color:#78350f;font-size:14px;">Ngân hàng: <strong>MB Bank</strong></p>
-        <p style="margin:4px 0;color:#78350f;font-size:14px;">Số tài khoản: <strong>0123456789</strong></p>
-        <p style="margin:4px 0;color:#78350f;font-size:14px;">Tên tài khoản: <strong>PHONG KHAM HEALTHCONNECT</strong></p>
-        <p style="margin:4px 0;color:#78350f;font-size:14px;">Số tiền: <strong style="color:#dc2626;">500.000 VNĐ</strong></p>
+        <p style="margin:4px 0;color:#78350f;font-size:14px;">Ngân hàng: <strong>${bankName}</strong></p>
+        <p style="margin:4px 0;color:#78350f;font-size:14px;">Số tài khoản: <strong>${bankAccount}</strong></p>
+        <p style="margin:4px 0;color:#78350f;font-size:14px;">Tên tài khoản: <strong>${bankOwner}</strong></p>
+        <p style="margin:4px 0;color:#78350f;font-size:14px;">Số tiền: <strong style="color:#dc2626;">${amountLabel}</strong></p>
         <p style="margin:10px 0 0;color:#92400e;font-size:13px;font-weight:600;">
-          Nội dung CK bắt buộc: <span style="background:#fef3c7;padding:2px 8px;border-radius:4px;">TTKHAM ${data.bookingToken?.slice(-8)?.toUpperCase()}</span>
+          Nội dung CK bắt buộc: <span style="background:#fef3c7;padding:2px 8px;border-radius:4px;">${transferRef}</span>
         </p>
       </div>
       <p style="color:#ef4444;font-size:13px;margin:0;">

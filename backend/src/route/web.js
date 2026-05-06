@@ -10,6 +10,9 @@ import statsController from '../controllers/statsController.js';
 let router = express.Router();
 
 const initWebRoutes = (app) => {
+
+    router.post('/crud', userController.handleCrud);
+
     // User
     router.post('/api/login', userController.handleLogin);
     router.post('/api/register', userController.handleRegister);

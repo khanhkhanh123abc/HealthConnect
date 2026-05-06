@@ -56,7 +56,7 @@ const ClinicDetail = () => {
             <div className="bg-white border-b pt-20">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row gap-6 items-start">
                     <img
-                        src={clinic.image || 'https://via.placeholder.com/112'}
+                        src={clinic.image || '/default-avatar.svg'}
                         alt={clinic.name}
                         className="w-28 h-28 rounded-2xl object-cover border border-gray-200 flex-shrink-0"
                     />
@@ -132,7 +132,7 @@ const ClinicDetail = () => {
                                         <div key={doc.id}
                                             className="bg-white rounded-2xl border border-gray-200 p-5 flex gap-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
                                             <img
-                                                src={doc.image || 'https://via.placeholder.com/64'}
+                                                src={doc.image || '/default-avatar.svg'}
                                                 alt={name}
                                                 className="w-16 h-16 rounded-full object-cover border border-gray-200 flex-shrink-0"
                                             />

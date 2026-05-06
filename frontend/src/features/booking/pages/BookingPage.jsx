@@ -51,7 +51,7 @@ const CardGrid = ({ items, onSelect, selected, type }) => (
                     className={`flex flex-col items-center p-4 rounded-xl border-2 transition hover:shadow-md text-left
                         ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
                     <img
-                        src={item.image || 'https://via.placeholder.com/80'}
+                        src={item.image || '/default-avatar.svg'}
                         alt={item.name}
                         className="w-16 h-16 object-cover rounded-full border border-gray-200 mb-3"
                     />
@@ -79,7 +79,7 @@ const DoctorCard = ({ doctor, onSelect, selected, onViewProfile }) => {
             ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
             <button onClick={() => onSelect(doctor)} className="flex items-center gap-4 flex-1 text-left">
                 <img
-                    src={doctor.image || 'https://via.placeholder.com/56'}
+                    src={doctor.image || '/default-avatar.svg'}
                     alt={name}
                     className="w-14 h-14 rounded-full object-cover border-2 border-blue-100 flex-shrink-0"
                 />
@@ -345,7 +345,7 @@ const BookingPage = () => {
                         {/* Doctor info */}
                         <div className="flex items-center gap-4 mb-6 pb-5 border-b">
                             <img
-                                src={selectedDoctor.image || 'https://via.placeholder.com/56'}
+                                src={selectedDoctor.image || '/default-avatar.svg'}
                                 alt=""
                                 className="w-14 h-14 rounded-full object-cover border-2 border-blue-100"
                             />

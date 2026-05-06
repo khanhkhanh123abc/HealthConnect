@@ -213,7 +213,7 @@ const Home = () => {
                                 <button key={spec.id} onClick={() => navigate('/booking')}
                                     className="flex flex-col items-center p-4 rounded-2xl hover:bg-blue-50 active:scale-[0.98] transition-all duration-200 group">
                                     <div className="w-14 h-14 rounded-full overflow-hidden border border-gray-200 group-hover:border-blue-200 transition-colors mb-2">
-                                        <img src={spec.image || 'https://via.placeholder.com/56'} alt={spec.name} className="w-full h-full object-cover" />
+                                        <img src={spec.image || '/default-avatar.svg'} alt={spec.name} className="w-full h-full object-cover" />
                                     </div>
                                     <p className="text-xs font-medium text-gray-700 group-hover:text-blue-600 leading-tight text-center transition-colors">
                                         {spec.name}
@@ -348,7 +348,7 @@ const Home = () => {
                                     className="bg-white rounded-2xl border border-gray-200/60 p-5 text-center hover:shadow-lg hover:-translate-y-0.5 hover:shadow-gray-200/50 transition-all duration-300 group">
                                     <div onClick={() => navigate(`/doctor-profile/${doctor.id}`)} className="cursor-pointer">
                                         <div className="w-20 h-20 rounded-full overflow-hidden mx-auto mb-3 border border-gray-200 group-hover:border-blue-200 transition-colors">
-                                            <img src={doctor.image || 'https://via.placeholder.com/80'}
+                                            <img src={doctor.image || '/default-avatar.svg'}
                                                 alt={`${doctor.lastName} ${doctor.firstName}`}
                                                 className="w-full h-full object-cover" />
                                         </div>

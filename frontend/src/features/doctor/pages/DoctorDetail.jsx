@@ -80,8 +80,12 @@ const DoctorDetail = () => {
                 <div className="bg-white rounded-2xl border border-gray-200/60 p-6 mb-4">
                     <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
                         <div className="w-24 h-24 md:w-28 md:h-28 rounded-full overflow-hidden flex-shrink-0 ring-4 ring-blue-50">
-                            <img src={detailDoctor.image || ''}
-                                alt={nameVi} className="w-full h-full object-cover" />
+                            <img
+                                src={detailDoctor.image || '/default-avatar.svg'}
+                                alt={nameVi}
+                                className="w-full h-full object-cover"
+                                onError={e => { e.currentTarget.src = '/default-avatar.svg'; }}
+                            />
                         </div>
                         <div className="flex-1 text-center md:text-left">
                             <h1 className="text-xl font-semibold text-gray-900 mb-2">{nameVi}</h1>

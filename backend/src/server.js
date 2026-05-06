@@ -14,7 +14,15 @@ startAutoCancelCron();
 let app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(cors());
+app.use(cors({
+    origin: [
+        'https://health-connect-sooty-omega.vercel.app',
+        'https://healthconnect.io.vn',
+        'http://localhost:3000',
+        'http://localhost:5173',
+    ],
+    credentials: true,
+}));
 
 configViewEngine(app);
 initWebRoutes(app);

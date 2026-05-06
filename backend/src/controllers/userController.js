@@ -77,6 +77,28 @@ let getAllCode = async (req, res) => {
     }
 };
 
+let handleCrud = async (req, res) => {
+    try {
+        const { action, ...data } = req.body;
+        let result;
+        if (action === 'CREATE') {
+            result = await userService.createNewUser(data);
+        } else if (action === 'UPDATE') {
+            result = await userService.updateUserData(data);
+        } else if (action === 'DELETE') {
+            if (!data.id) return res.status(400).json({ errCode: 1, errMessage: 'Missing id' });
+            result = await userService.deleteUser(data.id);
+        } else if (action === 'GET_ALL') {
+            result = await userService.getAllUsers('ALL');
+        } else {
+            return res.status(400).json({ errCode: 1, errMessage: 'Unknown action' });
+        }
+        return res.status(200).json(result);
+    } catch (e) {
+        return res.status(500).json({ errCode: -1, errMessage: 'Error from server' });
+    }
+};
+
 module.exports = {
     handleLogin,
     handleGetAllUsers,
@@ -85,4 +107,5 @@ module.exports = {
     handleDeleteUser,
     getAllCode,
     handleRegister,
+    handleCrud,
 };

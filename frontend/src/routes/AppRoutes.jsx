@@ -17,6 +17,7 @@ import ConfirmBooking from '../features/booking/pages/ConfirmBooking';
 import BookingPage from '../features/booking/pages/BookingPage';
 import PaymentResult from '../features/booking/pages/PaymentResult';
 import ClinicDetail from '../features/clinic/pages/ClinicDetail';
+import SearchResults from '../features/search/pages/SearchResults';
 
 const AppRoutes = () => {
     const { isLoggedIn, userInfo } = useSelector((state) => state.user);
@@ -42,6 +43,7 @@ const AppRoutes = () => {
 
             <Route path="/confirm-booking" element={<ConfirmBooking />} />
             <Route path="/booking" element={<DefaultLayout><BookingPage /></DefaultLayout>} />
+            <Route path="/search" element={<DefaultLayout><SearchResults /></DefaultLayout>} />
             <Route path="/doctor-profile/:id" element={<DefaultLayout><DoctorDetail /></DefaultLayout>} />
             <Route path="/clinic/:id" element={<ClinicDetail />} />
             <Route path="/payment-result" element={<PaymentResult />} />

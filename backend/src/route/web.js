@@ -6,6 +6,8 @@ import clinicController from '../controllers/clinicController.js';
 import bookingController from '../controllers/bookingController.js';
 import searchController from '../controllers/searchController.js';
 import statsController from '../controllers/statsController.js';
+import symptomKeywordController from '../controllers/symptomKeywordController.js';
+import reviewController from '../controllers/reviewController.js';
 
 let router = express.Router();
 
@@ -64,6 +66,19 @@ const initWebRoutes = (app) => {
 
     // Search
     router.get('/api/global-search', searchController.globalSearch);
+    router.get('/api/search', searchController.fullSearch);
+
+    // Symptom keyword (admin)
+    router.get('/api/symptom-keyword', symptomKeywordController.getAll);
+    router.post('/api/symptom-keyword', symptomKeywordController.create);
+    router.put('/api/symptom-keyword', symptomKeywordController.update);
+    router.delete('/api/symptom-keyword', symptomKeywordController.remove);
+
+    // Review
+    router.post('/api/review', reviewController.create);
+    router.get('/api/review/by-doctor', reviewController.getByDoctor);
+    router.get('/api/review/by-booking', reviewController.getByBooking);
+    router.delete('/api/review', reviewController.remove);
 
     // Stats
     router.get('/api/admin-stats', statsController.getAdminStats);

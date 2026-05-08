@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Calendar, MapPin, Clock, ArrowLeft, CreditCard, Search } from 'lucide-react';
+import { Calendar, MapPin, Clock, ArrowLeft, CreditCard, Search, Star } from 'lucide-react';
 import { getBookingsByPatientService, cancelBookingService } from '../services/bookingService';
+import { getReviewByBookingService } from '../services/reviewService';
+import ReviewModal from '../components/ReviewModal';
 
 const STATUS_CONFIG = {
     S1: { label: 'Pending',    color: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' },
@@ -14,22 +16,57 @@ const STATUS_CONFIG = {
 
 const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+const StarSummary = ({ rating, comment }) => (
+    <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-100">
+        <div className="flex items-center gap-1">
+            {[1, 2, 3, 4, 5].map(i => (
+                <Star key={i} className={`w-3.5 h-3.5 ${i <= rating ? 'text-amber-400 fill-amber-400' : 'text-amber-200'}`} />
+            ))}
+            <span className="text-xs font-medium text-amber-700 ml-1">Your review</span>
+        </div>
+        {comment && <p className="text-xs text-amber-900/70 mt-1.5 leading-relaxed">{comment}</p>}
+    </div>
+);
+
 const MyBookings = () => {
     const navigate = useNavigate();
     const userInfo = useSelector(state => state.user.userInfo);
     const isLoggedIn = useSelector(state => state.user.isLoggedIn);
 
     const [bookings, setBookings] = useState([]);
+    const [reviewByBooking, setReviewByBooking] = useState({});
     const [isLoading, setIsLoading] = useState(true);
     const [cancellingId, setCancellingId] = useState(null);
     const [filterDate, setFilterDate] = useState('');
+
+    // Review modal state.
+    const [reviewModalOpen, setReviewModalOpen] = useState(false);
+    const [activeReviewBooking, setActiveReviewBooking] = useState(null);
 
     const fetchBookings = useCallback(async () => {
         if (!userInfo?.id) return;
         setIsLoading(true);
         try {
-            let res = await getBookingsByPatientService(userInfo.id);
-            setBookings(res?.data?.data || []);
+            const res = await getBookingsByPatientService(userInfo.id);
+            const list = res?.data?.data || [];
+            setBookings(list);
+
+            // Fetch existing reviews for completed bookings only.
+            const completed = list.filter(b => b.statusId === 'S3');
+            if (completed.length) {
+                const reviewResults = await Promise.all(
+                    completed.map(b =>
+                        getReviewByBookingService(b.id).then(r => [b.id, r?.data?.data || null]).catch(() => [b.id, null])
+                    )
+                );
+                const map = {};
+                for (const [bid, review] of reviewResults) {
+                    if (review) map[bid] = review;
+                }
+                setReviewByBooking(map);
+            } else {
+                setReviewByBooking({});
+            }
         } catch {
             toast.error('Failed to load appointments.');
         } finally {
@@ -50,7 +87,7 @@ const MyBookings = () => {
 
         setCancellingId(booking.id);
         try {
-            let res = await cancelBookingService(booking.id, userInfo.id);
+            const res = await cancelBookingService(booking.id, userInfo.id);
             const data = res?.data || res;
             const errCode = data?.errCode;
             if (errCode === 0) {
@@ -68,6 +105,16 @@ const MyBookings = () => {
         } finally {
             setCancellingId(null);
         }
+    };
+
+    const openReviewModal = (booking) => {
+        setActiveReviewBooking(booking);
+        setReviewModalOpen(true);
+    };
+
+    const handleReviewSubmitted = (newReview) => {
+        if (!activeReviewBooking) return;
+        setReviewByBooking(prev => ({ ...prev, [activeReviewBooking.id]: newReview }));
     };
 
     const filteredBookings = useMemo(() => {
@@ -171,6 +218,8 @@ const MyBookings = () => {
                         const isCancelling = cancellingId === booking.id;
                         const canCancel = ['S1', 'S2'].includes(booking.statusId);
                         const isPaidVNPay = booking.statusId === 'S2' && booking.paymentMethod === 'BANK';
+                        const isCompleted = booking.statusId === 'S3';
+                        const existingReview = reviewByBooking[booking.id];
 
                         return (
                             <div key={booking.id}
@@ -229,6 +278,19 @@ const MyBookings = () => {
                                                 )}
                                             </div>
                                         )}
+
+                                        {isCompleted && !existingReview && (
+                                            <div className="mt-3">
+                                                <button onClick={() => openReviewModal(booking)}
+                                                    className="flex items-center gap-1.5 text-xs font-medium text-amber-600 border border-amber-200 hover:bg-amber-50 px-3 py-1.5 rounded-lg transition-colors">
+                                                    <Star className="w-3.5 h-3.5" /> Leave a review
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {isCompleted && existingReview && (
+                                            <StarSummary rating={existingReview.rating} comment={existingReview.comment} />
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -236,6 +298,14 @@ const MyBookings = () => {
                     })}
                 </div>
             )}
+
+            <ReviewModal
+                isOpen={reviewModalOpen}
+                onClose={() => setReviewModalOpen(false)}
+                booking={activeReviewBooking}
+                patientId={userInfo?.id}
+                onSubmitted={handleReviewSubmitted}
+            />
         </div>
     );
 };

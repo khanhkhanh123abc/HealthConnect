@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
+import { Search, Star } from 'lucide-react';
 import axios from '../../../app/axios';
 import DoctorSchedule from '../../../shared/components/DoctorSchedule';
 import BookingModal from '../components/BookingModal';
 
-// ─── STEPPER HEADER ───────────────────────────────────────────
 const STEPS = ['Specialty', 'Clinic', 'Doctor', 'Booking'];
 
+// ─── STEPPER HEADER ───────────────────────────────────────────
 const StepHeader = ({ current }) => (
     <div className="flex items-center justify-center mb-8 gap-0">
         {STEPS.map((label, idx) => {
@@ -41,7 +42,21 @@ const StepHeader = ({ current }) => (
     </div>
 );
 
-// ─── CARD GRID ────────────────────────────────────────────────
+// ─── STEP SEARCH BAR ──────────────────────────────────────────
+const StepSearch = ({ value, onChange, placeholder, children }) => (
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
+        <div className="flex items-center gap-2 bg-white border border-gray-200/60 rounded-xl px-3 py-2 flex-1">
+            <Search className="w-4 h-4 text-gray-400 shrink-0" />
+            <input type="text" value={value}
+                onChange={e => onChange(e.target.value)}
+                placeholder={placeholder}
+                className="text-sm bg-transparent border-0 outline-none text-gray-700 placeholder-gray-400 w-full" />
+        </div>
+        {children}
+    </div>
+);
+
+// ─── CARD GRID (specialty + clinic) ───────────────────────────
 const CardGrid = ({ items, onSelect, selected, type }) => (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {items.map(item => {
@@ -121,6 +136,7 @@ const SkeletonGrid = ({ count = 8 }) => (
 // ─── MAIN COMPONENT ──────────────────────────────────────────
 const BookingPage = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const isLoggedIn = useSelector(state => state.user.isLoggedIn);
 
     const [step, setStep] = useState(1);
@@ -134,9 +150,19 @@ const BookingPage = () => {
     const [selectedClinic, setSelectedClinic] = useState(null);
     const [selectedDoctor, setSelectedDoctor] = useState(null);
 
+    // Per-step search inputs.
+    const [specialtySearch, setSpecialtySearch] = useState('');
+    const [clinicSearch, setClinicSearch] = useState('');
+    const [doctorSearch, setDoctorSearch] = useState('');
+    const [doctorMinRating, setDoctorMinRating] = useState(0);
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [bookingInfo, setBookingInfo] = useState(null);
 
+    // Guard so URL-based pre-filter only runs once on mount.
+    const preFilterApplied = useRef(false);
+
+    // ───── load specialties + restore session state ──────────────────
     useEffect(() => {
         const saved = sessionStorage.getItem('hc_booking_state');
         if (saved) {
@@ -164,10 +190,92 @@ const BookingPage = () => {
         load();
     }, []);
 
+    // ───── apply ?specialtyId=&clinicId= URL pre-filter ──────────────
+    useEffect(() => {
+        if (preFilterApplied.current) return;
+        const specialtyIdParam = searchParams.get('specialtyId');
+        const clinicIdParam = searchParams.get('clinicId');
+        if (!specialtyIdParam) return;
+        if (specialties.length === 0) return; // wait for specialties to load
+        preFilterApplied.current = true;
+
+        const targetSpecialty = specialties.find(s => String(s.id) === String(specialtyIdParam));
+        if (!targetSpecialty) {
+            toast.warn('Specialty not found.');
+            return;
+        }
+
+        (async () => {
+            setLoading(true);
+            try {
+                setSelectedSpecialty(targetSpecialty);
+                const clinicRes = await axios.get(`/api/get-clinics-by-specialty?specialtyId=${targetSpecialty.id}`);
+                const clinicList = clinicRes?.data?.data || [];
+                setClinics(clinicList);
+
+                if (!clinicIdParam) {
+                    setStep(clinicList.length ? 2 : 1);
+                    if (!clinicList.length) toast.info('No clinics available for this specialty.');
+                    return;
+                }
+
+                const targetClinic = clinicList.find(c => String(c.id) === String(clinicIdParam));
+                if (!targetClinic) {
+                    toast.warn('Clinic not found for this specialty.');
+                    setStep(2);
+                    return;
+                }
+                setSelectedClinic(targetClinic);
+                const doctorRes = await axios.get(
+                    `/api/get-doctors-by-clinic?clinicId=${targetClinic.id}&specialtyId=${targetSpecialty.id}`
+                );
+                const doctorList = doctorRes?.data?.data || [];
+                setDoctors(doctorList);
+                setStep(doctorList.length ? 3 : 2);
+                if (!doctorList.length) toast.info('No doctors at this clinic for this specialty.');
+            } catch {
+                toast.error('Failed to apply pre-filter.');
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, [specialties, searchParams]);
+
+    // ───── filtered lists for each step ──────────────────────────────
+    const filteredSpecialties = useMemo(() => {
+        const q = specialtySearch.trim().toLowerCase();
+        if (!q) return specialties;
+        return specialties.filter(s => (s.name || '').toLowerCase().includes(q));
+    }, [specialties, specialtySearch]);
+
+    const filteredClinics = useMemo(() => {
+        const q = clinicSearch.trim().toLowerCase();
+        if (!q) return clinics;
+        return clinics.filter(c =>
+            (c.name || '').toLowerCase().includes(q) ||
+            (c.address || '').toLowerCase().includes(q));
+    }, [clinics, clinicSearch]);
+
+    const filteredDoctors = useMemo(() => {
+        const q = doctorSearch.trim().toLowerCase();
+        return doctors.filter(d => {
+            const name = `${d.lastName || ''} ${d.firstName || ''}`.toLowerCase();
+            if (q && !name.includes(q)) return false;
+            if (doctorMinRating > 0) {
+                const r = Number(d.averageRating || 0);
+                if (r < doctorMinRating) return false;
+            }
+            return true;
+        });
+    }, [doctors, doctorSearch, doctorMinRating]);
+
+    // ───── handlers ──────────────────────────────────────────────────
     const handleSelectSpecialty = async (spec) => {
         setSelectedSpecialty(spec);
         setSelectedClinic(null);
         setSelectedDoctor(null);
+        setClinicSearch('');
+        setDoctorSearch('');
         setLoading(true);
         try {
             let res = await axios.get(`/api/get-clinics-by-specialty?specialtyId=${spec.id}`);
@@ -185,6 +293,7 @@ const BookingPage = () => {
     const handleSelectClinic = async (clinic) => {
         setSelectedClinic(clinic);
         setSelectedDoctor(null);
+        setDoctorSearch('');
         setLoading(true);
         try {
             let res = await axios.get(
@@ -279,8 +388,15 @@ const BookingPage = () => {
                 {step === 1 && (
                     <div>
                         <h2 className="text-lg font-semibold text-gray-700 mb-4">Select Specialty</h2>
-                        {loading ? <SkeletonGrid /> : (
-                            <CardGrid items={specialties} selected={selectedSpecialty} onSelect={handleSelectSpecialty} type="specialty" />
+                        <StepSearch value={specialtySearch}
+                            onChange={setSpecialtySearch}
+                            placeholder="Search specialties..." />
+                        {loading ? <SkeletonGrid /> : filteredSpecialties.length === 0 ? (
+                            <div className="text-center py-12 text-sm text-gray-400 bg-white rounded-xl border border-gray-200/60">
+                                No matching specialties
+                            </div>
+                        ) : (
+                            <CardGrid items={filteredSpecialties} selected={selectedSpecialty} onSelect={handleSelectSpecialty} type="specialty" />
                         )}
                     </div>
                 )}
@@ -291,8 +407,15 @@ const BookingPage = () => {
                         <h2 className="text-lg font-semibold text-gray-700 mb-4">
                             Select Clinic — <span className="text-blue-600">{selectedSpecialty?.name}</span>
                         </h2>
-                        {loading ? <SkeletonGrid count={4} /> : (
-                            <CardGrid items={clinics} selected={selectedClinic} onSelect={handleSelectClinic} type="clinic" />
+                        <StepSearch value={clinicSearch}
+                            onChange={setClinicSearch}
+                            placeholder="Search clinics..." />
+                        {loading ? <SkeletonGrid count={4} /> : filteredClinics.length === 0 ? (
+                            <div className="text-center py-12 text-sm text-gray-400 bg-white rounded-xl border border-gray-200/60">
+                                No matching clinics
+                            </div>
+                        ) : (
+                            <CardGrid items={filteredClinics} selected={selectedClinic} onSelect={handleSelectClinic} type="clinic" />
                         )}
                     </div>
                 )}
@@ -303,6 +426,27 @@ const BookingPage = () => {
                         <h2 className="text-lg font-semibold text-gray-700 mb-4">
                             Select Doctor — <span className="text-blue-600">{selectedClinic?.name}</span>
                         </h2>
+                        <StepSearch value={doctorSearch}
+                            onChange={setDoctorSearch}
+                            placeholder="Search doctors by name...">
+                            <div className="flex items-center gap-1.5">
+                                {[0, 3, 4, 5].map(r => (
+                                    <button key={r} onClick={() => setDoctorMinRating(r)}
+                                        className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+                                            doctorMinRating === r
+                                                ? 'bg-blue-600 text-white border-blue-600'
+                                                : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                                        }`}>
+                                        {r === 0 ? 'Any' : (
+                                            <>
+                                                <Star className={`w-3 h-3 ${doctorMinRating === r ? 'fill-white' : 'fill-amber-400 text-amber-400'}`} />
+                                                {r}+
+                                            </>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </StepSearch>
                         {loading ? (
                             <div className="space-y-3">
                                 {[1, 2, 3].map(i => (
@@ -315,9 +459,13 @@ const BookingPage = () => {
                                     </div>
                                 ))}
                             </div>
+                        ) : filteredDoctors.length === 0 ? (
+                            <div className="text-center py-12 text-sm text-gray-400 bg-white rounded-xl border border-gray-200/60">
+                                No matching doctors
+                            </div>
                         ) : (
                             <div className="flex flex-col gap-3">
-                                {doctors.map(doc => (
+                                {filteredDoctors.map(doc => (
                                     <DoctorCard key={doc.id} doctor={doc}
                                         selected={selectedDoctor}
                                         onSelect={handleSelectDoctor}

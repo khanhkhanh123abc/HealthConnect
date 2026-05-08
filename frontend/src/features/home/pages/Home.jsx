@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { useLocation } from 'react-router-dom';
-import { ChevronRight, Calendar, MapPin, Stethoscope, Building2 } from 'lucide-react';
+import { ChevronRight, Calendar, MapPin, Stethoscope, Building2, ArrowRight } from 'lucide-react';
 import HomeHeader from '../../../shared/components/Header/Header';
 import { getTopDoctorHomeService } from '../../doctor/services/doctorService';
 import { getAllClinicsService } from '../../clinic/services/clinicService';
+import { quickSearchService } from '../../search/services/searchService';
 import axios from '../../../app/axios';
 
 const Home = () => {
@@ -62,16 +62,34 @@ const Home = () => {
         const timer = setTimeout(async () => {
             setSearchLoading(true);
             try {
-                const res = await axios.get(`/api/global-search?q=${encodeURIComponent(searchQuery)}`);
+                const res = await quickSearchService(searchQuery);
                 if (res?.data?.errCode === 0) {
-                    setSearchResults({ doctors: res.data.doctors || [], specialties: res.data.specialties || [] });
+                    setSearchResults({
+                        doctors: res.data.doctors || [],
+                        specialties: res.data.specialties || []
+                    });
                     setSearchOpen(true);
                 }
             } catch {}
             finally { setSearchLoading(false); }
-        }, 400);
+        }, 300);
         return () => clearTimeout(timer);
     }, [searchQuery]);
+
+    const goToSearchPage = () => {
+        const q = searchQuery.trim();
+        if (!q) return;
+        navigate(`/search?q=${encodeURIComponent(q)}`);
+        setSearchOpen(false);
+        setSearchQuery('');
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            goToSearchPage();
+        }
+    };
 
     const SkeletonCard = () => (
         <div className="bg-white rounded-2xl border border-gray-200/60 p-5 animate-pulse">
@@ -80,6 +98,9 @@ const Home = () => {
             <div className="h-3 bg-gray-100 rounded-lg w-1/2 mx-auto" />
         </div>
     );
+
+    const dropdownHasContent =
+        searchResults.doctors.length > 0 || searchResults.specialties.length > 0;
 
     return (
         <div className="w-full bg-gray-50 min-h-screen">
@@ -110,7 +131,8 @@ const Home = () => {
                                 type="text"
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
-                                onFocus={() => (searchResults.doctors.length > 0 || searchResults.specialties.length > 0) && setSearchOpen(true)}
+                                onKeyDown={handleKeyDown}
+                                onFocus={() => dropdownHasContent && setSearchOpen(true)}
                                 onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
                                 placeholder="Search doctors, specialties, symptoms..."
                                 className="w-full pl-12 pr-10 py-4 rounded-2xl text-gray-800 text-sm shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-300"
@@ -122,13 +144,17 @@ const Home = () => {
                                 </svg>
                             )}
                         </div>
-                        {searchOpen && (searchResults.doctors.length > 0 || searchResults.specialties.length > 0) && (
+                        {searchOpen && dropdownHasContent && (
                             <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl overflow-hidden z-50 text-left border border-gray-100">
                                 {searchResults.specialties.length > 0 && (
                                     <>
                                         <div className="px-4 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100">Specialties</div>
                                         {searchResults.specialties.map(s => (
-                                            <button key={s.id} onMouseDown={() => { navigate('/booking'); setSearchOpen(false); setSearchQuery(''); }}
+                                            <button key={`spec-${s.id}`} onMouseDown={() => {
+                                                navigate(`/booking?specialtyId=${s.id}`);
+                                                setSearchOpen(false);
+                                                setSearchQuery('');
+                                            }}
                                                 className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-3 transition-colors">
                                                 <Stethoscope className="w-4 h-4 text-blue-500 shrink-0" />
                                                 <span className="font-medium">{s.name}</span>
@@ -140,20 +166,32 @@ const Home = () => {
                                     <>
                                         <div className="px-4 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100">Doctors</div>
                                         {searchResults.doctors.map(d => (
-                                            <button key={d.id} onMouseDown={() => { navigate(`/doctor-profile/${d.id}`); setSearchOpen(false); setSearchQuery(''); }}
+                                            <button key={`doc-${d.id}`} onMouseDown={() => {
+                                                navigate(`/doctor-profile/${d.id}`);
+                                                setSearchOpen(false);
+                                                setSearchQuery('');
+                                            }}
                                                 className="w-full px-4 py-3 text-left hover:bg-blue-50 flex items-center gap-3 transition-colors">
                                                 {d.image
                                                     ? <img src={d.image} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
                                                     : <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-semibold shrink-0">{d.name?.[0]}</div>
                                                 }
-                                                <div>
-                                                    <p className="text-sm font-semibold text-gray-800">{d.name}</p>
-                                                    {d.position && <p className="text-xs text-gray-400">{d.position}</p>}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-gray-800 truncate">{d.name}</p>
+                                                    {(d.position || d.specialtyName) && (
+                                                        <p className="text-xs text-gray-400 truncate">
+                                                            {d.position}{d.position && d.specialtyName ? ' · ' : ''}{d.specialtyName}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </button>
                                         ))}
                                     </>
                                 )}
+                                <button onMouseDown={goToSearchPage}
+                                    className="w-full px-4 py-3 text-sm font-medium text-blue-600 hover:bg-blue-50 flex items-center justify-center gap-2 border-t border-gray-100 transition-colors">
+                                    View all results <ArrowRight className="w-4 h-4" />
+                                </button>
                             </div>
                         )}
                     </div>
@@ -210,7 +248,7 @@ const Home = () => {
                     ) : specialties.length > 0 ? (
                         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-4">
                             {specialties.map(spec => (
-                                <button key={spec.id} onClick={() => navigate('/booking')}
+                                <button key={spec.id} onClick={() => navigate(`/booking?specialtyId=${spec.id}`)}
                                     className="flex flex-col items-center p-4 rounded-2xl hover:bg-blue-50 active:scale-[0.98] transition-all duration-200 group">
                                     <div className="w-14 h-14 rounded-full overflow-hidden border border-gray-200 group-hover:border-blue-200 transition-colors mb-2">
                                         <img src={spec.image || '/default-avatar.svg'} alt={spec.name} className="w-full h-full object-cover" />

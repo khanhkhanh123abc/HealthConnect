@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import db from '../models/index';
 import { Op } from 'sequelize';
 import nodemailer from 'nodemailer';
+import logger from '../utils/logger.js';
 
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -106,7 +107,7 @@ const sendExpiredEmail = async ({ patientEmail, patientName, doctorName, timeVal
             html
         });
     } catch (e) {
-        console.error('[CRON] Lỗi gửi email hủy hạn:', e.message);
+        logger.error({ err: e }, '[CRON] sendExpiredEmail error');
     }
 };
 
@@ -127,7 +128,7 @@ const startAutoCancelCron = () => {
 
             if (expiredBookings.length === 0) return;
 
-            console.log(`[CRON] ${expiredBookings.length} booking hết hạn, đang xử lý...`);
+            logger.info({ count: expiredBookings.length }, '[CRON] expired bookings detected');
 
             for (const booking of expiredBookings) {
                 const t = await db.sequelize.transaction();
@@ -158,7 +159,7 @@ const startAutoCancelCron = () => {
                     }
 
                     await t.commit();
-                    console.log(`[CRON] Đã hủy booking id=${booking.id}`);
+                    logger.info({ bookingId: booking.id }, '[CRON] booking auto-cancelled');
 
                     // ✅ Gửi email thông báo (sau commit, non-blocking)
                     (async () => {
@@ -192,24 +193,24 @@ const startAutoCancelCron = () => {
                                     timeValue: timeTypeData?.value || booking.timeType,
                                     dateStr: formatDate(booking.date)
                                 });
-                                console.log(`[CRON] Đã gửi email hủy hạn đến ${patient.email}`);
+                                logger.info({ recipient: patient.email, bookingId: booking.id }, '[CRON] expired email sent');
                             }
                         } catch (emailErr) {
-                            console.error('[CRON] Lỗi gửi email:', emailErr.message);
+                            logger.error({ err: emailErr, bookingId: booking.id }, '[CRON] expired email failed');
                         }
                     })();
 
                 } catch (err) {
                     await t.rollback();
-                    console.error(`[CRON] Lỗi hủy booking id=${booking.id}:`, err.message);
+                    logger.error({ err, bookingId: booking.id }, '[CRON] cancel booking failed');
                 }
             }
         } catch (err) {
-            console.error('[CRON] Lỗi cron:', err.message);
+            logger.error({ err }, '[CRON] cron iteration failed');
         }
     });
 
-    console.log('[CRON] Auto-cancel cron đã khởi động (mỗi phút)');
+    logger.info('[CRON] auto-cancel cron started (1 min interval)');
 };
 
 module.exports = { startAutoCancelCron };

@@ -1,7 +1,26 @@
 import db from '../models/index.js';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { Op } from 'sequelize';
+import logger from '../utils/logger.js';
 
 const salt = bcrypt.genSaltSync(10);
+
+const ACTIVE_BOOKING_STATUSES = ['S1', 'S2'];
+
+const TOKEN_TTL = '7d';
+
+const signToken = (user) => {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        throw new Error('JWT_SECRET is not set');
+    }
+    return jwt.sign(
+        { id: user.id, roleId: user.roleId, email: user.email },
+        secret,
+        { expiresIn: TOKEN_TTL }
+    );
+};
 
 const hashUserPassword = async (password) => {
     return bcrypt.hashSync(password, salt);
@@ -30,12 +49,13 @@ const handleUserLogin = async (email, password) => {
     if (!check) return { errCode: 3, errMessage: 'Wrong password' };
 
     delete user.password;
-    return { errCode: 0, errMessage: 'OK', user };
+    const token = signToken(user);
+    return { errCode: 0, errMessage: 'OK', user, token };
 };
 
 const registerUser = async (data) => {
     let check = await checkUserEmail(data.email);
-    if (check) return { errCode: 1, errMessage: 'Email này đã được sử dụng. Vui lòng thử email khác!' };
+    if (check) return { errCode: 1, errMessage: 'This email is already registered. Please try another email.' };
 
     let hashPasswordFromLib = await hashUserPassword(data.password);
     await db.User.create({
@@ -48,7 +68,7 @@ const registerUser = async (data) => {
         gender: data.gender,
         roleId: 'R3',
     });
-    return { errCode: 0, message: 'Đăng ký tài khoản thành công!' };
+    return { errCode: 0, message: 'Account registration successful!' };
 };
 
 const getAllUsers = async (userId) => {
@@ -75,7 +95,7 @@ const createNewUser = async (data) => {
     return { errCode: 0, message: 'ok create a new user successfully' };
 };
 
-const updateUserData = async (data) => {
+const updateUserData = async (data, requesterRoleId) => {
     if (!data.id) return { errCode: 2, errMessage: 'Missing required parameters' };
     let user = await db.User.findOne({ where: { id: data.id }, raw: false });
     if (!user) return { errCode: 1, errMessage: "User's not found!" };
@@ -84,17 +104,58 @@ const updateUserData = async (data) => {
     user.address = data.address;
     user.phoneNumber = data.phoneNumber;
     user.gender = data.gender === '1' ? true : false;
-    user.roleId = data.roleId;
+    // Only an admin caller may change the user's roleId.
+    if (data.roleId && requesterRoleId === 'R1') user.roleId = data.roleId;
     user.positionId = data.positionId;
     user.image = data.image;
     await user.save();
     return { errCode: 0, message: 'Update the user succeeds!' };
 };
 
+// Defensive delete: block when active bookings exist; otherwise cascade-clean
+// non-FK-enforced satellite tables before destroying the user. Reviews are
+// removed automatically through the Reviews FK CASCADE constraint.
 const deleteUser = async (userId) => {
-    let count = await db.User.destroy({ where: { id: userId } });
-    if (count) return { errCode: 0, message: 'Delete the user succeeds!' };
-    return { errCode: 1, errMessage: "User's not found!" };
+    if (!userId) return { errCode: 1, errMessage: 'Missing user id' };
+
+    const user = await db.User.findByPk(userId);
+    if (!user) return { errCode: 1, errMessage: "User's not found!" };
+
+    const bookingWhere = user.roleId === 'R2'
+        ? { doctorId: userId, statusId: { [Op.in]: ACTIVE_BOOKING_STATUSES } }
+        : user.roleId === 'R3'
+            ? { patientId: userId, statusId: { [Op.in]: ACTIVE_BOOKING_STATUSES } }
+            : null;
+
+    if (bookingWhere) {
+        const activeCount = await db.Bookings.count({ where: bookingWhere });
+        if (activeCount > 0) {
+            const noun = user.roleId === 'R2' ? 'doctor' : 'patient';
+            return {
+                errCode: 2,
+                errMessage: `This ${noun} has ${activeCount} active booking(s). Cancel or complete them before deleting.`
+            };
+        }
+    }
+
+    const t = await db.sequelize.transaction();
+    try {
+        if (user.roleId === 'R2') {
+            await Promise.all([
+                db.Markdown.destroy({ where: { doctorId: userId }, transaction: t }),
+                db.Doctor_Info.destroy({ where: { doctorId: userId }, transaction: t }),
+                db.Doctor_Clinic_Specialty.destroy({ where: { doctorId: userId }, transaction: t }),
+                db.Schedule.destroy({ where: { doctorId: userId }, transaction: t })
+            ]);
+        }
+        await user.destroy({ transaction: t });
+        await t.commit();
+        return { errCode: 0, message: 'Delete the user succeeds!' };
+    } catch (err) {
+        await t.rollback();
+        logger.error({ err }, '[deleteUser]');
+        throw err;
+    }
 };
 
 const getAllCodeService = async (typeInput) => {
@@ -113,4 +174,5 @@ module.exports = {
     getAllCodeService,
     registerUser,
     hashUserPassword,
+    signToken,
 };

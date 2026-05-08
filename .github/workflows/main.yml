@@ -52,7 +52,7 @@ jobs:
               -e TZ=Asia/Ho_Chi_Minh \
               -v /etc/localtime:/etc/localtime:ro \
               -v /etc/timezone:/etc/timezone:ro \
-              -v /home/Khanh123abc/config.json:/app/src/config/config.json \
+              -v /home/Khanh123abc/config.json:/app/dist/config/config.json \
               --restart always \
               --name backend \
               ${{ secrets.DOCKERHUB_USERNAME }}/healthconnect:latest

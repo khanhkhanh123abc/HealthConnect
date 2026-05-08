@@ -34,7 +34,25 @@ const updateSpecialty = async (data) => {
 
 const deleteSpecialty = async (id) => {
     if (!id) return { errCode: 1, errMessage: 'Missing id' };
-    await db.Specialty.destroy({ where: { id } });
+
+    const specialty = await db.Specialty.findByPk(id);
+    if (!specialty) return { errCode: 2, errMessage: 'Specialty not found' };
+
+    // Block deletion if doctors still link to this specialty (via Markdown or
+    // Doctor_Clinic_Specialty). Force admin to detach first to avoid orphans.
+    const [markdownCount, dcsCount] = await Promise.all([
+        db.Markdown.count({ where: { specialtyId: id } }),
+        db.Doctor_Clinic_Specialty.count({ where: { specialtyId: id } })
+    ]);
+    if (markdownCount > 0 || dcsCount > 0) {
+        return {
+            errCode: 3,
+            errMessage: `Specialty is in use by ${markdownCount || dcsCount} doctor(s). Detach the doctors first.`
+        };
+    }
+
+    // SymptomKeywords cascade-delete via FK (safe to leave to DB).
+    await specialty.destroy();
     return { errCode: 0, errMessage: 'Delete specialty succeed!' };
 };
 

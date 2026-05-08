@@ -30,15 +30,25 @@ const Login = () => {
             const response = await handleLoginApi(email, password);
             if (response?.data?.errCode === 0) {
                 const user = response.data.user;
-                dispatch(loginSuccess(user));
+                const token = response.data.token;
+                dispatch(loginSuccess({ user, token }));
                 if (user.roleId === 'ADMIN' || user.roleId === 'R1') navigate('/system/dashboard');
                 else if (user.roleId === 'DOCTOR' || user.roleId === 'R2') navigate('/doctor/dashboard');
                 else navigate('/home');
             } else {
                 setErrorMessage(response?.data?.errMessage || 'Incorrect email or password');
             }
-        } catch {
-            setErrorMessage('Connection error. Please try again.');
+        } catch (err) {
+            // Backend now returns 401 for bad credentials — axios throws on
+            // non-2xx, so read the server-provided message when available.
+            const serverMsg = err?.response?.data?.errMessage;
+            if (serverMsg) {
+                setErrorMessage(serverMsg);
+            } else if (err?.response?.status === 429) {
+                setErrorMessage('Too many login attempts. Please wait and try again.');
+            } else {
+                setErrorMessage('Connection error. Please try again.');
+            }
         } finally {
             setLoading(false);
         }

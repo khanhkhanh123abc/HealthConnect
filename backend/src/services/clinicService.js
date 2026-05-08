@@ -42,7 +42,23 @@ const updateClinic = async (data) => {
 
 const deleteClinic = async (id) => {
     if (!id) return { errCode: 1, errMessage: 'Missing id' };
-    await db.Clinic.destroy({ where: { id } });
+
+    const clinic = await db.Clinic.findByPk(id);
+    if (!clinic) return { errCode: 2, errMessage: 'Clinic not found' };
+
+    // Block deletion if doctors still link to this clinic (via Markdown or DCS).
+    const [markdownCount, dcsCount] = await Promise.all([
+        db.Markdown.count({ where: { clinicId: id } }),
+        db.Doctor_Clinic_Specialty.count({ where: { clinicId: id } })
+    ]);
+    if (markdownCount > 0 || dcsCount > 0) {
+        return {
+            errCode: 3,
+            errMessage: `Clinic is in use by ${markdownCount || dcsCount} doctor(s). Detach the doctors first.`
+        };
+    }
+
+    await clinic.destroy();
     return { errCode: 0, errMessage: 'Delete clinic succeed!' };
 };
 

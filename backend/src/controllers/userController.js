@@ -1,16 +1,24 @@
 import userService from '../services/userServices.js';
+import logger from '../utils/logger.js';
 
 let handleLogin = async (req, res) => {
     let { email, password } = req.body;
     if (!email || !password) {
-        return res.status(400).json({ message: 'Missing email or password' });
+        return res.status(400).json({ errCode: 1, errMessage: 'Missing email or password' });
     }
-    let userData = await userService.handleUserLogin(email, password);
-    return res.status(200).json({
-        errCode: userData.errCode,
-        errMessage: userData.errMessage,
-        user: userData.user ? userData.user : {}
-    });
+    try {
+        let userData = await userService.handleUserLogin(email, password);
+        const status = userData.errCode === 0 ? 200 : 401;
+        return res.status(status).json({
+            errCode: userData.errCode,
+            errMessage: userData.errMessage,
+            user: userData.user ? userData.user : {},
+            token: userData.token || null
+        });
+    } catch (e) {
+        logger.error('[handleLogin]', e.message);
+        return res.status(500).json({ errCode: -1, errMessage: 'Internal server error' });
+    }
 };
 
 let handleGetAllUsers = async (req, res) => {
@@ -18,8 +26,13 @@ let handleGetAllUsers = async (req, res) => {
     if (!id) {
         return res.status(400).json({ errCode: 1, errMessage: 'Missing required parameter', users: [] });
     }
-    let users = await userService.getAllUsers(id);
-    return res.status(200).json({ errCode: 0, errMessage: 'OK', users: users });
+    try {
+        let users = await userService.getAllUsers(id);
+        return res.status(200).json({ errCode: 0, errMessage: 'OK', users });
+    } catch (e) {
+        logger.error('[handleGetAllUsers]', e.message);
+        return res.status(500).json({ errCode: -1, errMessage: 'Internal server error' });
+    }
 };
 
 let handleCreateNewUser = async (req, res) => {
@@ -27,7 +40,8 @@ let handleCreateNewUser = async (req, res) => {
         let message = await userService.createNewUser(req.body);
         return res.status(200).json(message);
     } catch (e) {
-        return res.status(200).json({ errCode: -1, errMessage: 'Error from server...' });
+        logger.error('[handleCreateNewUser]', e.message);
+        return res.status(500).json({ errCode: -1, errMessage: 'Internal server error' });
     }
 };
 
@@ -36,66 +50,45 @@ let handleRegister = async (req, res) => {
         let info = await userService.registerUser(req.body);
         return res.status(200).json(info);
     } catch (e) {
-        console.log(e);
-        return res.status(200).json({
-            errCode: -1,
-            errMessage: 'Lỗi từ phía máy chủ...'
-        });
+        logger.error('[handleRegister]', e.message);
+        return res.status(500).json({ errCode: -1, errMessage: 'Internal server error' });
     }
-}
+};
 
 let handleEditUser = async (req, res) => {
     try {
-        let message = await userService.updateUserData(req.body);
+        const requesterRoleId = req.user?.roleId;
+        let message = await userService.updateUserData(req.body, requesterRoleId);
         return res.status(200).json(message);
     } catch (e) {
-        return res.status(200).json({ errCode: -1, errMessage: 'Error from server...' });
+        logger.error('[handleEditUser]', e.message);
+        return res.status(500).json({ errCode: -1, errMessage: 'Internal server error' });
     }
 };
 
 let handleDeleteUser = async (req, res) => {
     try {
         if (!req.query.id) {
-            return res.status(200).json({ errCode: 1, errMessage: 'Missing required parameters!' });
+            return res.status(400).json({ errCode: 1, errMessage: 'Missing required parameters!' });
         }
         let message = await userService.deleteUser(req.query.id);
         return res.status(200).json(message);
     } catch (e) {
-        return res.status(200).json({ errCode: -1, errMessage: 'Error from server...' });
+        logger.error('[handleDeleteUser]', e.message);
+        return res.status(500).json({ errCode: -1, errMessage: 'Internal server error' });
     }
 };
 
 let getAllCode = async (req, res) => {
     try {
         if (!req.query.type) {
-            return res.status(200).json({ errCode: 1, errMessage: 'Missing required parameters!' });
+            return res.status(400).json({ errCode: 1, errMessage: 'Missing required parameters!' });
         }
         let response = await userService.getAllCodeService(req.query.type);
         return res.status(200).json(response);
     } catch (e) {
-        return res.status(200).json({ errCode: -1, errMessage: 'Error from server...' });
-    }
-};
-
-let handleCrud = async (req, res) => {
-    try {
-        const { action, ...data } = req.body;
-        let result;
-        if (action === 'CREATE') {
-            result = await userService.createNewUser(data);
-        } else if (action === 'UPDATE') {
-            result = await userService.updateUserData(data);
-        } else if (action === 'DELETE') {
-            if (!data.id) return res.status(400).json({ errCode: 1, errMessage: 'Missing id' });
-            result = await userService.deleteUser(data.id);
-        } else if (action === 'GET_ALL') {
-            result = await userService.getAllUsers('ALL');
-        } else {
-            return res.status(400).json({ errCode: 1, errMessage: 'Unknown action' });
-        }
-        return res.status(200).json(result);
-    } catch (e) {
-        return res.status(500).json({ errCode: -1, errMessage: 'Error from server' });
+        logger.error('[getAllCode]', e.message);
+        return res.status(500).json({ errCode: -1, errMessage: 'Internal server error' });
     }
 };
 
@@ -106,6 +99,5 @@ module.exports = {
     handleEditUser,
     handleDeleteUser,
     getAllCode,
-    handleRegister,
-    handleCrud,
+    handleRegister
 };

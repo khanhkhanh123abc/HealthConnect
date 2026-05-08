@@ -11,7 +11,37 @@ const config = require(__dirname + '/../config/config.json')[env];
 const db = {};
 
 let sequelize;
-if (config.use_env_variable) {
+if (env === 'production') {
+  // Production: read connection from env. Prefer DATABASE_URL (also used by
+  // sequelize-cli through use_env_variable in config.json); fall back to
+  // discrete DB_* variables for environments where a single URL is awkward.
+  const sslOptions = process.env.DB_SSL === 'false'
+    ? {}
+    : { ssl: { require: true, rejectUnauthorized: false } };
+
+  if (process.env.DATABASE_URL) {
+    sequelize = new Sequelize(process.env.DATABASE_URL, {
+      dialect: 'mysql',
+      logging: false,
+      timezone: '+07:00',
+      dialectOptions: sslOptions
+    });
+  } else {
+    sequelize = new Sequelize(
+      process.env.DB_NAME,
+      process.env.DB_USER,
+      process.env.DB_PASSWORD,
+      {
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
+        dialect: 'mysql',
+        logging: false,
+        timezone: '+07:00',
+        dialectOptions: sslOptions
+      }
+    );
+  }
+} else if (config.use_env_variable) {
   sequelize = new Sequelize(process.env[config.use_env_variable], config);
 } else {
   sequelize = new Sequelize(config.database, config.username, config.password, config);

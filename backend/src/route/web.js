@@ -8,81 +8,98 @@ import searchController from '../controllers/searchController.js';
 import statsController from '../controllers/statsController.js';
 import symptomKeywordController from '../controllers/symptomKeywordController.js';
 import reviewController from '../controllers/reviewController.js';
+import { verifyToken, requireRole } from '../middleware/auth.js';
+import { authLimiter } from '../middleware/rateLimit.js';
+import { validate } from '../middleware/validate.js';
+import {
+    registerSchema,
+    loginSchema,
+    createNewUserSchema,
+    editUserSchema
+} from '../validators/userValidator.js';
+import {
+    createBookingSchema,
+    cancelBookingSchema,
+    createPaypalOrderSchema
+} from '../validators/bookingValidator.js';
 
 let router = express.Router();
 
 const initWebRoutes = (app) => {
 
-    router.post('/crud', userController.handleCrud);
-
-    // User
-    router.post('/api/login', userController.handleLogin);
-    router.post('/api/register', userController.handleRegister);
-    router.get('/api/get-all-users', userController.handleGetAllUsers);
-    router.post('/api/create-new-user', userController.handleCreateNewUser);
-    router.put('/api/edit-user', userController.handleEditUser);
-    router.delete('/api/delete-user', userController.handleDeleteUser);
+    // ─────────── PUBLIC ───────────
+    router.post('/api/login',    authLimiter, validate(loginSchema),    userController.handleLogin);
+    router.post('/api/register', authLimiter, validate(registerSchema), userController.handleRegister);
     router.get('/api/allcode', userController.getAllCode);
 
-    // Doctor
+    // Public reads (no auth) — homepage / browsing.
     router.get('/api/top-doctor-home', doctorController.getTopDoctorHome);
     router.get('/api/get-all-doctors', doctorController.getAllDoctors);
-    router.post('/api/save-info-doctors', doctorController.postInforDoctor);
     router.get('/api/get-profile-doctor-by-id', doctorController.getProfileDoctorById);
-    router.post('/api/bulk-create-schedule', doctorController.bulkCreateSchedule);
-    router.get('/api/get-schedule-doctor-by-date', doctorController.getScheduleByDate);
     router.get('/api/get-clinics-by-specialty', doctorController.getClinicsBySpecialty);
     router.get('/api/get-doctors-by-clinic', doctorController.getDoctorsByClinicAndSpecialty);
 
-    // Specialty
-    router.post('/api/create-new-specialty', specialtyController.createSpecialty);
     router.get('/api/get-all-specialty', specialtyController.getAllSpecialty);
-    router.put('/api/update-specialty', specialtyController.updateSpecialty);
-    router.delete('/api/delete-specialty', specialtyController.deleteSpecialty);
-
-    // Clinic
-    router.post('/api/create-new-clinic', clinicController.createClinic);
     router.get('/api/get-all-clinic', clinicController.getAllClinics);
     router.get('/api/get-clinic-by-id', clinicController.getClinicById);
-    router.put('/api/update-clinic', clinicController.updateClinic);
-    router.delete('/api/delete-clinic', clinicController.deleteClinic);
     router.get('/api/get-doctors-by-clinic-id', clinicController.getDoctorsByClinic);
 
-    // Booking
-    router.post('/api/create-booking', bookingController.createBooking);
-    router.get('/api/confirm-booking', bookingController.confirmBooking);
-    router.get('/api/get-bookings-by-patient', bookingController.getBookingsByPatient);
-    router.put('/api/cancel-booking', bookingController.cancelBooking);
-    router.get('/api/get-schedule-with-slots', bookingController.getScheduleWithSlots);
-    router.get('/api/get-bookings-by-doctor', bookingController.getBookingsByDoctor);
-    router.put('/api/complete-booking', bookingController.completeBooking);
-    router.post('/api/send-medical-record', bookingController.sendMedicalRecord);
-    router.put('/api/confirm-payment', bookingController.confirmPayment);
-    router.get('/api/get-pending-bank-bookings', bookingController.getPendingBankBookings);
-    router.put('/api/doctor-cancel-booking', bookingController.doctorCancelBooking);
-    router.post('/api/create-paypal-order', bookingController.createPaypalOrder);
-    router.get('/api/paypal-return', bookingController.paypalReturn);
-    router.post('/api/send-prescription', bookingController.sendPrescription);
-
-    // Search
     router.get('/api/global-search', searchController.globalSearch);
     router.get('/api/search', searchController.fullSearch);
-
-    // Symptom keyword (admin)
-    router.get('/api/symptom-keyword', symptomKeywordController.getAll);
-    router.post('/api/symptom-keyword', symptomKeywordController.create);
-    router.put('/api/symptom-keyword', symptomKeywordController.update);
-    router.delete('/api/symptom-keyword', symptomKeywordController.remove);
-
-    // Review
-    router.post('/api/review', reviewController.create);
     router.get('/api/review/by-doctor', reviewController.getByDoctor);
-    router.get('/api/review/by-booking', reviewController.getByBooking);
-    router.delete('/api/review', reviewController.remove);
 
-    // Stats
-    router.get('/api/admin-stats', statsController.getAdminStats);
-    router.get('/api/doctor-stats', statsController.getDoctorStats);
+    // PayPal callback — public (PayPal hits this).
+    router.get('/api/paypal-return', bookingController.paypalReturn);
+    // Booking confirm via email link — public token-based.
+    router.get('/api/confirm-booking', bookingController.confirmBooking);
+
+    // ─────────── AUTHENTICATED (any role) ───────────
+    router.get('/api/get-schedule-doctor-by-date', verifyToken, doctorController.getScheduleByDate);
+    router.get('/api/get-schedule-with-slots',     verifyToken, bookingController.getScheduleWithSlots);
+    router.get('/api/review/by-booking',           verifyToken, reviewController.getByBooking);
+
+    // ─────────── ADMIN (R1) ───────────
+    router.get('/api/get-all-users',   verifyToken, requireRole('R1'), userController.handleGetAllUsers);
+    router.post('/api/create-new-user', verifyToken, requireRole('R1'), validate(createNewUserSchema), userController.handleCreateNewUser);
+    router.put('/api/edit-user',        verifyToken, requireRole('R1'), validate(editUserSchema),       userController.handleEditUser);
+    router.delete('/api/delete-user',   verifyToken, requireRole('R1'), userController.handleDeleteUser);
+
+    router.get('/api/admin-stats',                    verifyToken, requireRole('R1'), statsController.getAdminStats);
+    router.get('/api/get-pending-bank-bookings',      verifyToken, requireRole('R1'), bookingController.getPendingBankBookings);
+    router.put('/api/confirm-payment',                verifyToken, requireRole('R1'), bookingController.confirmPayment);
+
+    router.post('/api/save-info-doctors',    verifyToken, requireRole('R1'), doctorController.postInforDoctor);
+    router.post('/api/bulk-create-schedule', verifyToken, requireRole('R1', 'R2'), doctorController.bulkCreateSchedule);
+
+    router.post('/api/create-new-specialty', verifyToken, requireRole('R1'), specialtyController.createSpecialty);
+    router.put('/api/update-specialty',      verifyToken, requireRole('R1'), specialtyController.updateSpecialty);
+    router.delete('/api/delete-specialty',   verifyToken, requireRole('R1'), specialtyController.deleteSpecialty);
+
+    router.post('/api/create-new-clinic', verifyToken, requireRole('R1'), clinicController.createClinic);
+    router.put('/api/update-clinic',      verifyToken, requireRole('R1'), clinicController.updateClinic);
+    router.delete('/api/delete-clinic',   verifyToken, requireRole('R1'), clinicController.deleteClinic);
+
+    router.post('/api/symptom-keyword',   verifyToken, requireRole('R1'), symptomKeywordController.create);
+    router.put('/api/symptom-keyword',    verifyToken, requireRole('R1'), symptomKeywordController.update);
+    router.delete('/api/symptom-keyword', verifyToken, requireRole('R1'), symptomKeywordController.remove);
+    router.get('/api/symptom-keyword',    verifyToken, requireRole('R1'), symptomKeywordController.getAll);
+
+    // ─────────── DOCTOR (R2) ───────────
+    router.get('/api/get-bookings-by-doctor',  verifyToken, requireRole('R2', 'R1'), bookingController.getBookingsByDoctor);
+    router.put('/api/complete-booking',        verifyToken, requireRole('R2', 'R1'), bookingController.completeBooking);
+    router.post('/api/send-medical-record',    verifyToken, requireRole('R2', 'R1'), bookingController.sendMedicalRecord);
+    router.post('/api/send-prescription',      verifyToken, requireRole('R2', 'R1'), bookingController.sendPrescription);
+    router.put('/api/doctor-cancel-booking',   verifyToken, requireRole('R2', 'R1'), bookingController.doctorCancelBooking);
+    router.get('/api/doctor-stats',            verifyToken, requireRole('R2', 'R1'), statsController.getDoctorStats);
+
+    // ─────────── PATIENT or ADMIN (R3 / R1) ───────────
+    router.get('/api/get-bookings-by-patient', verifyToken, requireRole('R3', 'R1'), bookingController.getBookingsByPatient);
+    router.put('/api/cancel-booking',          verifyToken, requireRole('R3', 'R1'), validate(cancelBookingSchema), bookingController.cancelBooking);
+    router.post('/api/create-booking',         verifyToken, requireRole('R3', 'R1'), validate(createBookingSchema), bookingController.createBooking);
+    router.post('/api/create-paypal-order',    verifyToken, requireRole('R3', 'R1'), validate(createPaypalOrderSchema), bookingController.createPaypalOrder);
+
+    router.post('/api/review',  verifyToken, requireRole('R3', 'R1'), reviewController.create);
+    router.delete('/api/review', verifyToken, requireRole('R3', 'R1'), reviewController.remove);
 
     return app.use('/', router);
 };

@@ -1,5 +1,6 @@
 const paypal = require('@paypal/checkout-server-sdk');
 const db = require('../models');
+const logger = require('../utils/logger').default || require('../utils/logger');
 
 let environment = new paypal.core.SandboxEnvironment(
     process.env.PAYPAL_CLIENT_ID,
@@ -8,15 +9,46 @@ let environment = new paypal.core.SandboxEnvironment(
 
 let client = new paypal.core.PayPalHttpClient(environment);
 
-// Tạo order và trả về approvalUrl để redirect user đến PayPal
-let createPaypalOrder = async (bookingId, amountUsd) => {
+// Internal: resolve a doctor's authoritative price by joining
+// Doctor_Info → allCode (type='PRICE'). Returns numeric USD or null.
+const resolveDoctorPriceUsd = async (doctorId) => {
+    const info = await db.Doctor_Info.findOne({ where: { doctorId }, raw: true });
+    if (!info?.priceId) return null;
+
+    const code = await db.allCode.findOne({
+        where: { keyMap: info.priceId, type: 'PRICE' },
+        raw: true
+    });
+    if (!code?.value) return null;
+
+    // value examples: "$50", "50.00", "50 USD", "1,000,000 VND". Strip non-numeric.
+    const cleaned = String(code.value).replace(/[^\d.]/g, '');
+    const parsed = parseFloat(cleaned);
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    return parsed;
+};
+
+// Create order. The client cannot influence the amount — server resolves it
+// from the booking → doctor → price chain. Caller (controller) must confirm
+// req.user.id === booking.patientId before invoking.
+let createPaypalOrder = async (bookingId) => {
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:8080';
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-    const amount = parseFloat(amountUsd);
-    if (!amount || amount <= 0) {
-        console.error(`[PayPal] Invalid amountUsd=${amountUsd} for bookingId=${bookingId}`);
-        return { errCode: 1, errMessage: 'Số tiền thanh toán không hợp lệ!' };
+    if (!bookingId) return { errCode: 1, errMessage: 'Missing bookingId' };
+
+    const BookingModel = db.Booking || db.Bookings;
+    const booking = await BookingModel.findOne({ where: { id: bookingId }, raw: true });
+    if (!booking) return { errCode: 2, errMessage: 'Booking not found' };
+
+    if (!['S1', 'S2'].includes(booking.statusId)) {
+        return { errCode: 3, errMessage: 'Booking is not payable in its current state' };
+    }
+
+    const amount = await resolveDoctorPriceUsd(booking.doctorId);
+    if (!amount) {
+        logger.error({ bookingId, doctorId: booking.doctorId }, '[PayPal] cannot resolve price');
+        return { errCode: 4, errMessage: 'Price unavailable for this doctor' };
     }
 
     try {
@@ -40,22 +72,25 @@ let createPaypalOrder = async (bookingId, amountUsd) => {
             }]
         });
 
-        console.log(`[PayPal] Calling PayPal API — bookingId=${bookingId}, amount=$${amount.toFixed(2)}`);
         let response = await client.execute(request);
         let order = response.result;
         let approvalUrl = order.links.find(l => l.rel === 'approve')?.href;
 
-        console.log(`[PayPal] Order created — orderId=${order.id}, status=${order.status}`);
+        // Persist authoritative price on the booking so any later refund uses
+        // the same number (avoids re-querying allCode if it has drifted).
+        await BookingModel.update(
+            { price: Math.round(amount) },
+            { where: { id: bookingId } }
+        );
+
         return { errCode: 0, orderID: order.id, approvalUrl };
     } catch (err) {
-        console.error('[PayPal] client.execute error:', err?.message || err);
-        if (err?.statusCode) console.error('[PayPal] HTTP status:', err.statusCode);
-        if (err?.result) console.error('[PayPal] response body:', JSON.stringify(err.result));
+        logger.error({ err, statusCode: err?.statusCode, result: err?.result }, '[PayPal] client.execute error');
         throw err;
     }
 };
 
-// Capture order sau khi user approve trên PayPal và redirect về
+// Capture order after user approval and persist transaction details.
 let handlePaypalReturn = async (token, bookingId) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -86,21 +121,21 @@ let handlePaypalReturn = async (token, bookingId) => {
 
         return { errCode: 0, redirectUrl: `${frontendUrl}/payment-result?status=success` };
     } catch (err) {
-        console.error('PayPal capture error:', err);
+        logger.error({ err }, 'PayPal capture error');
         return { errCode: -1, redirectUrl: `${frontendUrl}/payment-result?status=error` };
     }
 };
 
-// Hoàn tiền PayPal khi hủy lịch
+// Refund a captured payment in full.
 let createRefund = async (booking) => {
     try {
         if (!booking.vnpTransactionNo) {
-            return { success: false, message: 'Không có thông tin giao dịch PayPal để hoàn tiền' };
+            return { success: false, message: 'Missing PayPal transaction reference; cannot refund.' };
         }
 
         let request = new paypal.payments.CapturesRefundRequest(booking.vnpTransactionNo);
         request.requestBody({
-            note_to_payer: 'Hoàn tiền hủy lịch hẹn HealthConnect'
+            note_to_payer: 'Refund for cancelled HealthConnect appointment'
         });
 
         let response = await client.execute(request);
@@ -111,11 +146,11 @@ let createRefund = async (booking) => {
         if (response.result.status === 'PENDING') {
             return { success: true, refundAmount: booking.price, isPending: true };
         }
-        return { success: false, message: `Hoàn tiền thất bại: ${response.result.status}` };
+        return { success: false, message: `Refund failed: ${response.result.status}` };
     } catch (err) {
-        console.error('PayPal refund error:', err);
-        return { success: false, message: err.message || 'Lỗi hoàn tiền PayPal' };
+        logger.error({ err }, 'PayPal refund error');
+        return { success: false, message: err.message || 'PayPal refund error' };
     }
 };
 
-module.exports = { createPaypalOrder, handlePaypalReturn, createRefund };
+module.exports = { createPaypalOrder, handlePaypalReturn, createRefund, resolveDoctorPriceUsd };

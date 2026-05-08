@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import { Provider } from 'react-redux';
 import { store, persistor } from './app/store';
-import 'bootstrap/dist/css/bootstrap.min.css';
 import './index.css';
 import { PersistGate } from 'redux-persist/integration/react';
 

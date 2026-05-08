@@ -1,26 +1,27 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-// const initialState = {
-//     isLoggedIn: false,
-//     userInfo: null,
-// };
-
 export const userSlice = createSlice({
     name: 'user',
     initialState: {
         isLoggedIn: false,
-        userInfo: null, // Sẽ chứa roleId ở đây
+        userInfo: null,
+        token: null
     },
     reducers: {
+        // Accept either { user, token } (preferred) or a bare user (legacy).
         loginSuccess: (state, action) => {
+            const payload = action.payload || {};
+            const isWrapped = payload && typeof payload === 'object' && 'user' in payload;
             state.isLoggedIn = true;
-            state.userInfo = action.payload; // payload bao gồm email, roleId...
+            state.userInfo = isWrapped ? payload.user : payload;
+            state.token = isWrapped ? (payload.token || null) : null;
         },
         processLogout: (state) => {
             state.isLoggedIn = false;
             state.userInfo = null;
-        },
-    },
+            state.token = null;
+        }
+    }
 });
 
 export const { loginSuccess, processLogout } = userSlice.actions;

@@ -1,4 +1,24 @@
 import nodemailer from 'nodemailer';
+import logger from '../utils/logger.js';
+
+// Wrap a fire-and-forget email send with one retry after 5 s. Caller passes
+// `label` and a context object (bookingId, recipient, etc.) used in the log
+// payload so an admin can reconcile failures manually.
+const sendWithRetry = async (label, context, sendFn) => {
+    try {
+        await sendFn();
+    } catch (err1) {
+        logger.warn({ err: err1, ...context }, `[email/${label}] first attempt failed, retrying in 5s`);
+        setTimeout(async () => {
+            try {
+                await sendFn();
+                logger.info({ ...context }, `[email/${label}] retry succeeded`);
+            } catch (err2) {
+                logger.error({ err: err2, ...context }, `[email/${label}] retry failed — manual intervention required`);
+            }
+        }, 5000);
+    }
+};
 
 // ===== CẤU HÌNH NODEMAILER =====
 let transporter = nodemailer.createTransport({
@@ -206,10 +226,10 @@ let sendBookingConfirmEmail = async (data) => {
       subject: `[HealthConnect] Xác nhận lịch khám - ${data.dateStr}`,
       html
     });
-    console.log(`Email sent to ${data.patientEmail}`);
+    logger.info({ recipient: data.patientEmail }, 'Booking confirm email sent');
     return true;
   } catch (e) {
-    console.error('Send email error:', e.message);
+    logger.error({ err: e }, 'Send email error');
     return false; // Không throw - lỗi email không nên block booking
   }
 };
@@ -217,7 +237,7 @@ let sendBookingConfirmEmail = async (data) => {
 // ===== GỬI EMAIL KHI HỦY LỊCH =====
 let sendCancelEmail = async (data) => {
   if (!data.patientEmail) {
-    console.error('sendCancelEmail: missing patientEmail');
+    logger.error('sendCancelEmail: missing patientEmail');
     return false;
   }
   try {
@@ -275,7 +295,7 @@ let sendCancelEmail = async (data) => {
     });
     return true;
   } catch (e) {
-    console.error('Send cancel email error:', e.message);
+    logger.error({ err: e }, 'Send cancel email error');
     return false;
   }
 };
@@ -325,14 +345,14 @@ ${data.content}
     });
     return true;
   } catch (e) {
-    console.error('Send medical record email error:', e.message);
+    logger.error({ err: e }, 'Send medical record email error');
     return false;
   }
 };
 // ===== EMAIL THÔNG BÁO CHỜ CHUYỂN KHOẢN =====
 let sendBankTransferPendingEmail = async (data) => {
   if (!data.patientEmail) {
-    console.error('sendBankTransferPendingEmail: missing patientEmail');
+    logger.error('sendBankTransferPendingEmail: missing patientEmail');
     return false;
   }
   try {
@@ -386,7 +406,7 @@ let sendBankTransferPendingEmail = async (data) => {
     });
     return true;
   } catch (e) {
-    console.error('Send bank pending email error:', e.message);
+    logger.error({ err: e }, 'Send bank pending email error');
     return false;
   }
 };
@@ -428,7 +448,7 @@ let sendBankTransferConfirmedEmail = async (data) => {
     });
     return true;
   } catch (e) {
-    console.error('Send bank confirmed email error:', e.message);
+    logger.error({ err: e }, 'Send bank confirmed email error');
     return false;
   }
 };
@@ -475,9 +495,9 @@ let sendPrescriptionEmail = async ({ patientEmail, patientName, doctorName, pdfB
     });
     return true;
   } catch (e) {
-    console.error('Send prescription email error:', e.message);
+    logger.error({ err: e }, 'Send prescription email error');
     return false;
   }
 };
 
-module.exports = { sendBookingConfirmEmail, sendCancelEmail, sendMedicalRecordEmail, sendBankTransferPendingEmail, sendBankTransferConfirmedEmail, sendPrescriptionEmail };
+module.exports = { sendBookingConfirmEmail, sendCancelEmail, sendMedicalRecordEmail, sendBankTransferPendingEmail, sendBankTransferConfirmedEmail, sendPrescriptionEmail, sendWithRetry };

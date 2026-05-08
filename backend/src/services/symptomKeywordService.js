@@ -8,15 +8,41 @@ const getAll = async (q) => {
     const trimmed = (q || '').trim();
     if (trimmed) {
         where[Op.and] = [
-            sqlWhere(fn('LOWER', col('keyword')), { [Op.like]: `%${escapeLike(trimmed.toLowerCase())}%` })
+            sqlWhere(
+                fn('LOWER', col('SymptomKeyword.keyword')),
+                { [Op.like]: `%${escapeLike(trimmed.toLowerCase())}%` }
+            )
         ];
     }
+
+    // Plain rows + manual specialty merge avoids include-related serialization
+    // issues ("result.get is not a function") from older Sequelize versions
+    // when the joined association is null or aliased oddly.
     const rows = await db.SymptomKeyword.findAll({
         where,
-        include: [{ model: db.Specialty, attributes: ['id', 'name'] }],
-        order: [['createdAt', 'DESC']]
+        order: [['createdAt', 'DESC']],
+        raw: true
     });
-    return { errCode: 0, data: rows };
+
+    if (!rows.length) return { errCode: 0, data: [] };
+
+    const specialtyIds = [...new Set(rows.map(r => r.specialtyId).filter(Boolean))];
+    const specialties = specialtyIds.length
+        ? await db.Specialty.findAll({
+            where: { id: { [Op.in]: specialtyIds } },
+            attributes: ['id', 'name'],
+            raw: true
+        })
+        : [];
+    const specMap = Object.fromEntries(specialties.map(s => [s.id, s]));
+
+    return {
+        errCode: 0,
+        data: rows.map(r => ({
+            ...r,
+            Specialty: specMap[r.specialtyId] || null
+        }))
+    };
 };
 
 const create = async (data) => {
@@ -30,7 +56,7 @@ const create = async (data) => {
         keyword: String(data.keyword).trim(),
         specialtyId: data.specialtyId
     });
-    return { errCode: 0, errMessage: 'Created', data: row };
+    return { errCode: 0, errMessage: 'Created', data: row.toJSON() };
 };
 
 const update = async (data) => {
@@ -45,7 +71,7 @@ const update = async (data) => {
     }
     if (data.keyword) row.keyword = String(data.keyword).trim();
     await row.save();
-    return { errCode: 0, errMessage: 'Updated', data: row };
+    return { errCode: 0, errMessage: 'Updated', data: row.toJSON() };
 };
 
 const remove = async (id) => {

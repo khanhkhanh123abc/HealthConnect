@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { X, Banknote, CreditCard } from 'lucide-react';
+import axios from '../../../app/axios';
 import { createBookingService } from '../services/bookingService';
 
 const ERROR_MESSAGES = {
@@ -12,8 +13,6 @@ const ERROR_MESSAGES = {
     4: 'You have already booked this time slot.',
     '-1': 'Server error. Please try again later.',
 };
-
-const BACKEND_URL = 'https://api.healthconnect.io.vn';
 
 const Spinner = () => (
     <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -72,13 +71,9 @@ const BookingModal = ({ isOpen, onClose, bookingInfo }) => {
             }
 
             if (paymentMethod === 'BANK') {
-                const payRes = await fetch(`${BACKEND_URL}/api/create-paypal-order`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ bookingId, amountUsd: usd }),
-                });
-                const payData = await payRes.json();
-                if (payData.errCode === 0 && payData.approvalUrl) {
+                const payRes = await axios.post('/api/create-paypal-order', { bookingId, amountUsd: usd });
+                const payData = payRes?.data;
+                if (payData?.errCode === 0 && payData?.approvalUrl) {
                     window.location.href = payData.approvalUrl;
                     return;
                 }

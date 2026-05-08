@@ -10,12 +10,24 @@ const instance = axios.create({
 // Hitting auto-logout on these would corrupt the login UX.
 const AUTH_PATH_RE = /\/api\/(login|register)(\?|$)/;
 
+// Strip a leading/trailing pair of literal `"` left over from redux-persist's
+// JSON.stringify when rehydration somehow produced the encoded form instead
+// of the parsed string. Without this, `Bearer "eyJhbG..."` is sent and the
+// backend's JWT verify rejects with 401.
+const cleanToken = (raw) => {
+    if (typeof raw !== 'string') return raw;
+    if (raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"')) {
+        try { return JSON.parse(raw); } catch { return raw.slice(1, -1); }
+    }
+    return raw;
+};
+
 // Attach JWT to every outgoing request when available.
 instance.interceptors.request.use(
     (config) => {
         try {
             const state = store.getState();
-            const token = state?.user?.token;
+            const token = cleanToken(state?.user?.token);
             if (token) {
                 config.headers = config.headers || {};
                 config.headers.Authorization = `Bearer ${token}`;

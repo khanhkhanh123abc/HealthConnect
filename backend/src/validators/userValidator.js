@@ -42,7 +42,10 @@ const editUserSchema = Joi.object({
     lastName: Joi.string().max(60).allow('', null),
     address: Joi.string().max(255).allow('', null),
     phoneNumber: Joi.string().max(20).allow('', null),
-    gender: Joi.alternatives().try(Joi.string().valid('0', '1'), Joi.boolean()).allow(null),
+    gender: Joi.alternatives().try(
+        Joi.string().valid('M', 'F', '0', '1', 'true', 'false', ''),
+        Joi.boolean()
+    ).allow(null),
     roleId: Joi.string().valid('R1', 'R2', 'R3').optional(),
     positionId: Joi.string().max(20).allow('', null),
     image: Joi.string().allow('', null)

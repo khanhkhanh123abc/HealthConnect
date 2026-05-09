@@ -8,19 +8,27 @@ var _require = require('sequelize'),
   Sequelize = _require.Sequelize;
 require('dotenv').config();
 var logger = require('../utils/logger')["default"] || require('../utils/logger');
-var sequelize = new Sequelize(process.env.DB_NAME || 'khankhank', process.env.DB_USER || 'root', process.env.DB_PASSWORD || null, {
-  host: process.env.DB_HOST || '127.0.0.1',
-  port: process.env.DB_PORT || 3306,
-  dialect: 'mysql',
-  logging: false,
-  timezone: '+07:00',
-  dialectOptions: process.env.DB_SSL === 'true' ? {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false
-    }
-  } : {}
-});
+var useSSL = process.env.DB_SSL === 'true' || /[?&]ssl-mode=REQUIRED/i.test(process.env.DATABASE_URL || '');
+var dialectOptions = useSSL ? { ssl: { require: true, rejectUnauthorized: false } } : {};
+var sequelize;
+if (process.env.DATABASE_URL) {
+  var cleanUrl = process.env.DATABASE_URL.replace(/\?.*$/, '');
+  sequelize = new Sequelize(cleanUrl, {
+    dialect: 'mysql',
+    logging: false,
+    timezone: '+07:00',
+    dialectOptions: dialectOptions
+  });
+} else {
+  sequelize = new Sequelize(process.env.DB_NAME || 'khankhank', process.env.DB_USER || 'root', process.env.DB_PASSWORD || null, {
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: process.env.DB_PORT || 3306,
+    dialect: 'mysql',
+    logging: false,
+    timezone: '+07:00',
+    dialectOptions: dialectOptions
+  });
+}
 var connectDB = /*#__PURE__*/function () {
   var _ref = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee() {
     var _t;

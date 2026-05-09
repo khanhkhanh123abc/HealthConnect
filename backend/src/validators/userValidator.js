@@ -28,7 +28,7 @@ const createNewUserSchema = Joi.object({
     lastName: Joi.string().max(60).allow('', null),
     address: Joi.string().max(255).allow('', null),
     phoneNumber: Joi.string().max(20).allow('', null),
-    gender: Joi.alternatives().try(Joi.string().valid('0', '1'), Joi.boolean()).allow(null),
+    gender: Joi.alternatives().try(Joi.string().valid('0', '1'), Joi.boolean(), Joi.number().valid(0, 1)).allow(null),
     roleId: Joi.string().valid('R1', 'R2', 'R3').required(),
     positionId: Joi.string().max(20).allow('', null),
     image: Joi.string().allow('', null)
@@ -44,7 +44,8 @@ const editUserSchema = Joi.object({
     phoneNumber: Joi.string().max(20).allow('', null),
     gender: Joi.alternatives().try(
         Joi.string().valid('M', 'F', '0', '1', 'true', 'false', ''),
-        Joi.boolean()
+        Joi.boolean(),
+        Joi.number().valid(0, 1)
     ).allow(null),
     roleId: Joi.string().valid('R1', 'R2', 'R3').optional(),
     positionId: Joi.string().max(20).allow('', null),

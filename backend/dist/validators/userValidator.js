@@ -26,7 +26,7 @@ var createNewUserSchema = _joi["default"].object({
   lastName: _joi["default"].string().max(60).allow('', null),
   address: _joi["default"].string().max(255).allow('', null),
   phoneNumber: _joi["default"].string().max(20).allow('', null),
-  gender: _joi["default"].alternatives()["try"](_joi["default"].string().valid('0', '1'), _joi["default"]["boolean"]()).allow(null),
+  gender: _joi["default"].alternatives()["try"](_joi["default"].string().valid('0', '1'), _joi["default"]["boolean"](), _joi["default"].number().valid(0, 1)).allow(null),
   roleId: _joi["default"].string().valid('R1', 'R2', 'R3').required(),
   positionId: _joi["default"].string().max(20).allow('', null),
   image: _joi["default"].string().allow('', null)
@@ -40,7 +40,7 @@ var editUserSchema = _joi["default"].object({
   lastName: _joi["default"].string().max(60).allow('', null),
   address: _joi["default"].string().max(255).allow('', null),
   phoneNumber: _joi["default"].string().max(20).allow('', null),
-  gender: _joi["default"].alternatives()["try"](_joi["default"].string().valid('M', 'F', '0', '1', 'true', 'false', ''), _joi["default"]["boolean"]()).allow(null),
+  gender: _joi["default"].alternatives()["try"](_joi["default"].string().valid('M', 'F', '0', '1', 'true', 'false', ''), _joi["default"]["boolean"](), _joi["default"].number().valid(0, 1)).allow(null),
   roleId: _joi["default"].string().valid('R1', 'R2', 'R3').optional(),
   positionId: _joi["default"].string().max(20).allow('', null),
   image: _joi["default"].string().allow('', null)
